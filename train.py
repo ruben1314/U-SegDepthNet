@@ -76,7 +76,7 @@ if __name__ == "__main__":
         epoch_iou_scores = [] # Computed only on test set
         epoch_dice_scores = [] # Computed only on test set
         
-        for batch, targets in virtual_kitty.load():
+        for batch, targets in virtual_kitty.load_train():
             # Convert samples to one-hot form
             batch = torch.tensor(batch)
             targets = torch.tensor(targets)
@@ -97,7 +97,7 @@ if __name__ == "__main__":
             del outputs
             torch.cuda.empty_cache()
 
-        for batch, targets in virtual_kitty.load():
+        for batch, targets in virtual_kitty.load_train():
             # Convert samples to one-hot form
             batch = torch.tensor(batch)
             targets = torch.tensor(targets)
