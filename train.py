@@ -33,10 +33,12 @@ def parse_args():
     parser.add_argument('-source', '--source', type=str, default="", required=True, help='Path to dataset images')
     parser.add_argument('-output', '--output', type=str, default="", required=True, help='Path to model output')
     parser.add_argument('-device', '--device', type=int, default=0, required=True, help='Device GPU to execute')
+    parser.add_argument('-batch_size', '--batch_size', type=int, default=1, required=True, help='Batch size to train')
     args = parser.parse_args()
     args_parsed['source'] = args.source
     args_parsed['output'] = args.output
     args_parsed['device'] = args.device
+    args_parsed['batch_size'] = args.batch_size
     print("Args parsed ", args_parsed)
 
 if __name__ == "__main__":
@@ -63,7 +65,7 @@ if __name__ == "__main__":
     avg_dice_scores = []
 
     TRAINING_START_TIME = time.time()
-    virtual_kitty = VirtualKitty(args_parsed["source"], 4)
+    virtual_kitty = VirtualKitty(args_parsed["source"], args_parsed["batch_size"])
 
     for epoch in range(epochs):
         print("############################### EPOCH ", epoch, " ###############################")
