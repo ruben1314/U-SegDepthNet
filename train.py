@@ -6,7 +6,6 @@ import time
 import numpy as np
 import argparse
 from datasets.dataset import VirtualKitty
-import sys
 
 def IOU(preds, targets, smooth=0.001):
     preds = preds.view(-1)
@@ -33,9 +32,11 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-source', '--source', type=str, default="", required=True, help='Path to dataset images')
     parser.add_argument('-output', '--output', type=str, default="", required=True, help='Path to model output')
+    parser.add_argument('-device', '--device', type=int, default=0, required=True, help='Device GPU to execute')
     args = parser.parse_args()
     args_parsed['source'] = args.source
     args_parsed['output'] = args.output
+    args_parsed['device'] = args.device
     print("Args parsed ", args_parsed)
 
 if __name__ == "__main__":
@@ -45,7 +46,7 @@ if __name__ == "__main__":
     in_channels = 3
     out_channels = 15
     model = FCN(in_channels, out_channels)
-    print(model.cuda())
+    print(model.cuda(device=args_parsed["device"]))
 
     # Hyperparameters
     epochs = 100
