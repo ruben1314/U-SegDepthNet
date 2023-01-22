@@ -101,7 +101,7 @@ if __name__ == "__main__":
             del outputs
             torch.cuda.empty_cache()
 
-        for batch, targets in virtual_kitty.load_train():
+        for batch, targets in virtual_kitty.load_train(train=False):
             # Convert samples to one-hot form
             batch = torch.tensor(batch)
             targets = torch.tensor(targets)

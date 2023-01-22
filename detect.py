@@ -43,45 +43,47 @@ if __name__ == "__main__":
     cm = "gray" # Color Map
     virtual_kitty = VirtualKitty(args_parsed['source'], args_parsed['batch_size'])
     batch_it = virtual_kitty.load_test()
-    for i in range(n):
+    # for i in range(n):
         # print("batch nexxt ", next(batch_it).shape)
-        print(f"SAMPLE #{i}")
-        batch_has_next = True
-        while batch_has_next:
-            try:
-                batch = next(batch_it)
-            # for batch in next(batch_it):
-                batch = torch.tensor(batch)
-                # Copy to GPU
-                batch = batch.float().cuda()
-                # targets = targets_one_hot.float().cuda()
-                # Forward Propagation
-                with torch.no_grad():
-                    outputs = model(batch)
-                # Plot Outputs
-                
-                for j in range(args_parsed['batch_size']):
-                    # Plot these results
-                    fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
-                    image = np.zeros((384, 1248,15), dtype=np.int8)
-                    for channel in range(15):
-                        predictions = outputs[j,channel].cpu()
-                        mapped_predictions = predictions > 0.75
-                        image[:,:,channel] = mapped_predictions
-                        ax[channel%3][channel%5].imshow(mapped_predictions, cmap=cm)
-                        ax[channel%3][channel%5].set_title("image")
-                    image_rgb = virtual_kitty.convert_channels_toRGB(image)
-                    # OpenCV needs BGR
-                    image_BGR = cv.cvtColor(np.float32(image_rgb), cv.COLOR_RGB2BGR)
-                    cv.imwrite(args_parsed['output'] + "output" + os.path.sep + "SAMPLE_" + str(i) + "_BATCH_SAMPLE_" + str(j) + ".jpg", image_BGR)
-                    #plt.show()
-                # Clear Cache
-                del batch
-                # del targets
-                del outputs
-                torch.cuda.empty_cache()
-                break # Only process one batch for every 'i'
-            except StopIteration as e:
-                batch_has_next = False
-                print("There are not more batches")
-                continue
+    i = 0
+    print(f"SAMPLE #{i}")
+    batch_has_next = True
+    while batch_has_next:
+        try:
+            batch = next(batch_it)
+        # for batch in next(batch_it):
+            batch = torch.tensor(batch)
+            # Copy to GPU
+            batch = batch.float().cuda()
+            # targets = targets_one_hot.float().cuda()
+            # Forward Propagation
+            with torch.no_grad():
+                outputs = model(batch)
+            # Plot Outputs
+            
+            for j in range(args_parsed['batch_size']):
+                # Plot these results
+                # fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
+                image = np.zeros((384, 1248,15), dtype=np.int8)
+                for channel in range(15):
+                    predictions = outputs[j,channel].cpu()
+                    mapped_predictions = predictions > 0.75
+                    image[:,:,channel] = mapped_predictions
+                    # ax[channel%3][channel%5].imshow(mapped_predictions, cmap=cm)
+                    # ax[channel%3][channel%5].set_title("image")
+                image_rgb = virtual_kitty.convert_channels_toRGB(image)
+                # OpenCV needs BGR
+                image_BGR = cv.cvtColor(np.float32(image_rgb), cv.COLOR_RGB2BGR)
+                cv.imwrite(args_parsed['output'] + "output" + os.path.sep + "SAMPLE_" + str(i) + "_BATCH_SAMPLE_" + str(j) + ".jpg", image_BGR)
+                #plt.show()
+            # Clear Cache
+            del batch
+            # del targets
+            del outputs
+            torch.cuda.empty_cache()
+            i += 1
+            # break # Only process one batch for every 'i'
+        except StopIteration as e:
+            batch_has_next = False
+            print("There are not more batches")
+            continue

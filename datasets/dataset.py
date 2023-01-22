@@ -33,13 +33,17 @@ class VirtualKitty():
         # sample = np.transpose(sample, (2, 0, 1))
         return sample
         
-    def load_train(self, shuffle=True):
+    def load_train(self, train=True, shuffle=True):
         batch_size = self.batch_size
         # Init
         batch = np.zeros((batch_size, 3, 384, 1248))
         targets = np.zeros((batch_size, 15, 384, 1248))
         base_dir = self.data_dir
-        print("Loading dataset in: ", self.data_dir)
+        if train:
+            base_dir = self.data_dir + os.path.sep + "train/"
+        else:
+            base_dir = self.data_dir + os.path.sep + "val/"
+        print("Loading dataset in: ", base_dir)
         samples = os.listdir(os.path.join(base_dir,"images"))
         if shuffle: random.shuffle(samples)
         # Yield samples when batch is full
