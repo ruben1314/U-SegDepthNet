@@ -48,7 +48,7 @@ class VirtualKitty():
             sample_dir = os.path.join(base_dir,"images") + os.path.sep + sample
             sample_name, _ = os.path.splitext(sample)
             sample_name_split = sample_name.split("_")
-            print("Sample load train", sample_dir   )
+            # print("Sample load train", sample_dir   )
             image = cv.imread(sample_dir)
             image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
             image = np.pad(image, ((0,9),(0,6),(0,0)), mode='constant', constant_values=0)
@@ -89,7 +89,7 @@ class VirtualKitty():
         base_dir = self.data_dir
         print("Loading dataset in: ", self.data_dir)
         samples = os.listdir(base_dir)
-        print("samples", samples)
+        # print("samples", samples)
         samples = sorted(samples)
         # if shuffle: random.shuffle(samples)
         # Yield samples when batch is full
