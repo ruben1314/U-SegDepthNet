@@ -30,7 +30,7 @@ if __name__ == "__main__":
     model = FCN(in_channels, out_channels)
     model.load_state_dict(torch.load(args_parsed['model']))
     model.eval()
-    model.cuda()
+    model.cuda(device=args_parsed['device'])
     if not os.path.exists("./runs/"):
         os.mkdir("./runs/")
     if not os.path.exists("./runs/detect/"):

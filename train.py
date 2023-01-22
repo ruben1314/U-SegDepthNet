@@ -34,11 +34,13 @@ def parse_args():
     parser.add_argument('-output', '--output', type=str, default="", required=True, help='Path to model output')
     parser.add_argument('-device', '--device', type=int, default=0, required=True, help='Device GPU to execute')
     parser.add_argument('-batch_size', '--batch_size', type=int, default=1, required=True, help='Batch size to train')
+    parser.add_argument('-model', '--model', type=str, default="", required=False, help='Path to model')
     args = parser.parse_args()
     args_parsed['source'] = args.source
     args_parsed['output'] = args.output
     args_parsed['device'] = args.device
     args_parsed['batch_size'] = args.batch_size
+    args_parsed['model'] = args.model
     print("Args parsed ", args_parsed)
 
 if __name__ == "__main__":
@@ -48,6 +50,8 @@ if __name__ == "__main__":
     in_channels = 3
     out_channels = 15
     model = FCN(in_channels, out_channels)
+    if args_parsed['model'] is not "":
+        model.load_state_dict(torch.load(args_parsed['model']))
     print(model.cuda(device=args_parsed["device"]))
 
     # Hyperparameters
