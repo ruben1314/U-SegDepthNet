@@ -50,7 +50,7 @@ if __name__ == "__main__":
     in_channels = 3
     out_channels = 15
     model = FCN(in_channels, out_channels)
-    if args_parsed['model'] is not "":
+    if args_parsed['model'] != "":
         model.load_state_dict(torch.load(args_parsed['model']))
     print(model.cuda(device=args_parsed["device"]))
 
