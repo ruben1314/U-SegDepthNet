@@ -35,12 +35,14 @@ def parse_args():
     parser.add_argument('-device', '--device', type=int, default=0, required=True, help='Device GPU to execute')
     parser.add_argument('-batch_size', '--batch_size', type=int, default=1, required=True, help='Batch size to train')
     parser.add_argument('-model', '--model', type=str, default="", required=False, help='Path to model')
+    parser.add_argument('-dataset_reduction', '--dataset_reduction', type=float, default=1.0, required=False, help='Percent to reduct dataset')
     args = parser.parse_args()
     args_parsed['source'] = args.source
     args_parsed['output'] = args.output
     args_parsed['device'] = args.device
     args_parsed['batch_size'] = args.batch_size
     args_parsed['model'] = args.model
+    args_parsed['dataset_reduction'] = args.dataset_reduction
     print("Args parsed ", args_parsed)
 
 if __name__ == "__main__":
@@ -80,7 +82,7 @@ if __name__ == "__main__":
         epoch_iou_scores = [] # Computed only on test set
         epoch_dice_scores = [] # Computed only on test set
         
-        for batch, targets in virtual_kitty.load_train():
+        for batch, targets in virtual_kitty.load_train(max_percent=args_parsed['dataset_reduction']):
             # Convert samples to one-hot form
             batch = torch.tensor(batch)
             targets = torch.tensor(targets)
@@ -101,7 +103,7 @@ if __name__ == "__main__":
             del outputs
             torch.cuda.empty_cache()
 
-        for batch, targets in virtual_kitty.load_train(train=False):
+        for batch, targets in virtual_kitty.load_train(train=False,max_percent=args_parsed['dataset_reduction']):
             # Convert samples to one-hot form
             batch = torch.tensor(batch)
             targets = torch.tensor(targets)

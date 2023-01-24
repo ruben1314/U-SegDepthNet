@@ -33,31 +33,50 @@ class VirtualKitty():
         # sample = np.transpose(sample, (2, 0, 1))
         return sample
         
-    def load_train(self, train=True, shuffle=True):
+    def load_train(self, train=True, shuffle=True, max_percent=1):
         batch_size = self.batch_size
         # Init
         batch = np.zeros((batch_size, 3, 384, 1248))
         targets = np.zeros((batch_size, 15, 384, 1248))
         base_dir = self.data_dir
         if train:
-            base_dir = self.data_dir + os.path.sep + "train/"
+            with open("./datasets/train.txt" , 'r') as f:
+                lines = f.readlines()
+                print("Loading dataset in: ", "./datasets/train.txt")
         else:
-            base_dir = self.data_dir + os.path.sep + "val/"
-        print("Loading dataset in: ", base_dir)
-        samples = os.listdir(os.path.join(base_dir,"images"))
-        if shuffle: random.shuffle(samples)
+            with open("./datasets/test.txt" , 'r') as f:
+                lines = f.readlines()
+                print("Loading dataset in: ", "./datasets/test.txt")
+        
+        # samples = os.listdir(os.path.join(base_dir,"images"))
+        
+        # if shuffle: random.shuffle(samples)
         # Yield samples when batch is full
         i = 0
-        for sample in samples:
-            sample_dir = os.path.join(base_dir,"images") + os.path.sep + sample
-            sample_name, _ = os.path.splitext(sample)
-            sample_name_split = sample_name.split("_")
+        lines = lines[:int(len(lines)*max_percent)]
+        for sample in lines:
+            # sample_dir = os.path.join(base_dir,"images") + os.path.sep + sample
+            # sample_name, _ = os.path.splitext(sample)
+            # sample_name_split = sample_name.split("_")
             # print("Sample load train", sample_dir   )
-            image = cv.imread(sample_dir)
+            image_seg_path = sample
+            image_seg_path = image_seg_path.replace("/rgb/", "/classSegmentation/")
+            basename = os.path.basename(image_seg_path)
+            image_seg_path = image_seg_path.replace(basename,"")
+            file_name, ext = os.path.splitext(basename)
+            file_name_splitted = file_name.split("_")
+            basename = "classgt_" + file_name_splitted[-1] + ".png"
+            image_seg_path = os.path.join(image_seg_path,basename)
+            image_seg_path = image_seg_path.replace("_rgb/","_classSegmentation/")
+            sample = sample.replace("\n","")
+            # print("sample path", sample)
+            # print("Image seg path ", image_seg_path)
+            # print(os.path.exists(sample))
+            image = cv.imread(sample)
             image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
             image = np.pad(image, ((0,9),(0,6),(0,0)), mode='constant', constant_values=0)
             image = np.resize(image, (image.shape[0], image.shape[1], image.shape[2]))
-            image_seg = cv.imread(os.path.join(base_dir,"labels") + os.path.sep + "classgt_" + sample_name_split[1] + ".png")
+            image_seg = cv.imread(image_seg_path)
             image_seg = cv.cvtColor(image_seg, cv.COLOR_BGR2RGB)
             image_seg = np.pad(image_seg, ((0,9),(0,6),(0,0)), mode='constant', constant_values=0)
             image_seg = np.resize(image_seg, (image.shape[0], image.shape[1], image.shape[2]))
