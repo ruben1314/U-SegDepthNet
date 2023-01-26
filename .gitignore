@@ -3,3 +3,7 @@ __pycache__
 runs/
 datasets/train.txt
 datasets/test.txt
+.vscode/
+*.jpg
+*.png
+*.torch
