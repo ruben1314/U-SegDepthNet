@@ -33,11 +33,11 @@ class VirtualKitty():
         # sample = np.transpose(sample, (2, 0, 1))
         return sample
         
-    def load_train(self, train=True, shuffle=True, max_percent=1):
+    def load_train(self, train=True, shuffle=True, max_percent=1, print_images_load=100):
         batch_size = self.batch_size
         # Init
-        batch = np.zeros((batch_size, 3, 384, 1248))
-        targets = np.zeros((batch_size, 15, 384, 1248))
+        batch = np.zeros((batch_size, 3, 192, 624))
+        targets = np.zeros((batch_size, 15, 192, 624))
         base_dir = self.data_dir
         if train:
             with open("./datasets/train.txt" , 'r') as f:
@@ -54,6 +54,7 @@ class VirtualKitty():
         # Yield samples when batch is full
         i = 0
         lines = lines[:int(len(lines)*max_percent)]
+        lines_to_process = len(lines)
         for sample in lines:
             # sample_dir = os.path.join(base_dir,"images") + os.path.sep + sample
             # sample_name, _ = os.path.splitext(sample)
@@ -74,13 +75,16 @@ class VirtualKitty():
             # print(os.path.exists(sample))
             image = cv.imread(sample)
             image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-            image = np.pad(image, ((0,9),(0,6),(0,0)), mode='constant', constant_values=0)
-            image = np.resize(image, (image.shape[0], image.shape[1], image.shape[2]))
+            # image = np.pad(image, ((0,5),(0,6),(0,0)), mode='constant', constant_values=0)
+            image = np.resize(image, (image.shape[0]//2, image.shape[1]//2, image.shape[2]))
+            image = np.pad(image, ((0,5),(0,3),(0,0)), mode='constant', constant_values=0)
             image_seg = cv.imread(image_seg_path)
             image_seg = cv.cvtColor(image_seg, cv.COLOR_BGR2RGB)
-            image_seg = np.pad(image_seg, ((0,9),(0,6),(0,0)), mode='constant', constant_values=0)
-            image_seg = np.resize(image_seg, (image.shape[0], image.shape[1], image.shape[2]))
+            # image_seg = np.pad(image_seg, ((0,9),(0,6),(0,0)), mode='constant', constant_values=0)
+            # image_seg = np.resize(image_seg, (image_seg.shape[0]//2, image_seg.shape[1]//2, image_seg.shape[2]))
             image_seg_channels = self._get_image_seg_channels(image_seg)
+            image_seg_channels = np.resize(image_seg_channels, (image_seg_channels.shape[0]//2, image_seg_channels.shape[1]//2, image_seg_channels.shape[2]))
+            image_seg_channels = np.pad(image_seg_channels, ((0,5),(0,3),(0,0)), mode='constant', constant_values=0)
             batch[i%batch_size, 0] = self.norm(self.process(image[:,:,0]))
             batch[i%batch_size, 1] = self.norm(self.process(image[:,:,1]))
             batch[i%batch_size, 2] = self.norm(self.process(image[:,:,2]))
@@ -102,6 +106,8 @@ class VirtualKitty():
             targets[i%batch_size, 14] = self.process(image_seg_channels[:,:,14])
             # Yield when batch is full
             i += 1
+            if ((i % print_images_load) == 0) or (i==1):
+                print("Imagenes cargadas", i, "/", lines_to_process, "para Train =", train, "test =", not train)
             if i > 0 and (i%batch_size) == 0:
                 yield batch, targets
 

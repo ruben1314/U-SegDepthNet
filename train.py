@@ -2,6 +2,7 @@ import os
 import re
 from UNet.UNed_model import FCN
 import torch
+from pytorchsummary import summary
 import time
 import numpy as np
 import argparse
@@ -36,6 +37,8 @@ def parse_args():
     parser.add_argument('-batch_size', '--batch_size', type=int, default=1, required=True, help='Batch size to train')
     parser.add_argument('-model', '--model', type=str, default="", required=False, help='Path to model')
     parser.add_argument('-dataset_reduction', '--dataset_reduction', type=float, default=1.0, required=False, help='Percent to reduct dataset')
+    parser.add_argument('-print_test', '--print_test', type=int, default=5, required=False, help='Epochs to calculate average test loss')
+    parser.add_argument('-print_images_load', '--print_images_load', type=int, default=100, required=False, help='Images load to print percent')
     args = parser.parse_args()
     args_parsed['source'] = args.source
     args_parsed['output'] = args.output
@@ -43,6 +46,8 @@ def parse_args():
     args_parsed['batch_size'] = args.batch_size
     args_parsed['model'] = args.model
     args_parsed['dataset_reduction'] = args.dataset_reduction
+    args_parsed['print_test'] = args.print_test
+    args_parsed['print_images_load'] = args.print_images_load
     print("Args parsed ", args_parsed)
 
 if __name__ == "__main__":
@@ -55,7 +60,10 @@ if __name__ == "__main__":
     if args_parsed['model'] != "":
         model.load_state_dict(torch.load(args_parsed['model']))
     print(model.cuda(device=args_parsed["device"]))
-
+    for name, parameter in model.named_parameters():
+        print("Parameter", name, parameter.numel())
+    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print("Numero de parametros toales", pytorch_total_params)
     # Hyperparameters
     epochs = 100
     learning_rate = 1.0e-3
@@ -82,7 +90,7 @@ if __name__ == "__main__":
         epoch_iou_scores = [] # Computed only on test set
         epoch_dice_scores = [] # Computed only on test set
         
-        for batch, targets in virtual_kitty.load_train(max_percent=args_parsed['dataset_reduction']):
+        for batch, targets in virtual_kitty.load_train(max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
             # Convert samples to one-hot form
             batch = torch.tensor(batch)
             targets = torch.tensor(targets)
@@ -93,6 +101,7 @@ if __name__ == "__main__":
             # Train
             optimizer.zero_grad()
             outputs = model(batch)
+            del outputs
             loss = criterion(outputs, targets) 
             epoch_train_losses.append(float(loss))
             loss.backward()
@@ -102,47 +111,52 @@ if __name__ == "__main__":
             del targets
             del outputs
             torch.cuda.empty_cache()
+        
+        if (epoch % args_parsed['print_test']) == 0:
+            for batch, targets in virtual_kitty.load_train(train=False,max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
+                # Convert samples to one-hot form
+                batch = torch.tensor(batch)
+                targets = torch.tensor(targets)
+                targets_one_hot = targets > 0
+                # Copy to GPU
+                batch = batch.float().cuda()
+                targets = targets_one_hot.float().cuda()
+                # Forward Propagation
+                with torch.no_grad():
+                    outputs = model(batch)
+                    loss = float(criterion(outputs, targets))
+                    predictions = outputs.cpu() > 0.75
+                    iou_score = float(IOU(predictions, targets_one_hot))
+                    # dice_score = float(DiceScore(predictions, targets_one_hot))
+                    epoch_iou_scores.append(iou_score)
+                    # epoch_dice_scores.append(dice_score)
+                    epoch_test_losses.append(loss)
+                # Clear Cache
+                del batch
+                del targets
+                del outputs
+                torch.cuda.empty_cache()
+            test_avg_loss = np.average(epoch_test_losses)
+            iou_avg_score = np.average(epoch_iou_scores)
+            dice_avg_score = np.average(epoch_dice_scores)
 
-        for batch, targets in virtual_kitty.load_train(train=False,max_percent=args_parsed['dataset_reduction']):
-            # Convert samples to one-hot form
-            batch = torch.tensor(batch)
-            targets = torch.tensor(targets)
-            targets_one_hot = targets > 0
-            # Copy to GPU
-            batch = batch.float().cuda()
-            targets = targets_one_hot.float().cuda()
-            # Forward Propagation
-            with torch.no_grad():
-                outputs = model(batch)
-                loss = float(criterion(outputs, targets))
-                predictions = outputs.cpu() > 0.75
-                iou_score = float(IOU(predictions, targets_one_hot))
-                # dice_score = float(DiceScore(predictions, targets_one_hot))
-                epoch_iou_scores.append(iou_score)
-                # epoch_dice_scores.append(dice_score)
-                epoch_test_losses.append(loss)
-            # Clear Cache
-            del batch
-            del targets
-            del outputs
-            torch.cuda.empty_cache()
+            test_avg_losses.append(test_avg_loss)
+            avg_iou_scores.append(iou_avg_score)
+            avg_dice_scores.append(dice_avg_score)
+
                 
         EPOCH_END_TIME = time.time()
         
         train_avg_loss = np.average(epoch_train_losses)
-        test_avg_loss = np.average(epoch_test_losses)
-        iou_avg_score = np.average(epoch_iou_scores)
-        dice_avg_score = np.average(epoch_dice_scores)
         
         train_avg_losses.append(train_avg_loss)
-        test_avg_losses.append(test_avg_loss)
-        avg_iou_scores.append(iou_avg_score)
-        avg_dice_scores.append(dice_avg_score)
-
+        
         training_time_stamp = int(EPOCH_END_TIME - TRAINING_START_TIME)
         epoch_time_taken = int(EPOCH_END_TIME - EPOCH_START_TIME)
         ep = f"{epoch+1}".zfill(2)
-        print(f"[{ep}/{epochs}]  TRAIN:{train_avg_loss:.5f}  TEST:{test_avg_loss:.5f}  AVG_DICE_SCORE:{dice_avg_score:.5f}  AVG_IOU_SCORE:{iou_avg_score:.5f}  TOOK:{epoch_time_taken}s (t:{training_time_stamp}s)")
+        print(f"[{ep}/{epochs}]  TRAIN:{train_avg_loss:.5f})",end="")
+        if (epoch % args_parsed['print_test'] == 0):
+            print(f"TEST:{test_avg_loss:.5f}  AVG_DICE_SCORE:{dice_avg_score:.5f}  AVG_IOU_SCORE:{iou_avg_score:.5f}  TOOK:{epoch_time_taken}s (t:{training_time_stamp}s)")
         
         # Save the model every 10 epochs
         if ((epoch+1) % 10) == 0:
