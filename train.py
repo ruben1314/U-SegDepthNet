@@ -39,6 +39,7 @@ def parse_args():
     parser.add_argument('-dataset_reduction', '--dataset_reduction', type=float, default=1.0, required=False, help='Percent to reduct dataset')
     parser.add_argument('-print_test', '--print_test', type=int, default=5, required=False, help='Epochs to calculate average test loss')
     parser.add_argument('-print_images_load', '--print_images_load', type=int, default=100, required=False, help='Images load to print percent')
+    parser.add_argument('-epochs', '--epochs', type=int, default=100, required=False, help='Epochs to train. Default:100')
     args = parser.parse_args()
     args_parsed['source'] = args.source
     args_parsed['output'] = args.output
@@ -48,6 +49,7 @@ def parse_args():
     args_parsed['dataset_reduction'] = args.dataset_reduction
     args_parsed['print_test'] = args.print_test
     args_parsed['print_images_load'] = args.print_images_load
+    args_parsed['epochs'] = args.epochs
     print("Args parsed ", args_parsed)
 
 if __name__ == "__main__":
@@ -65,7 +67,7 @@ if __name__ == "__main__":
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Numero de parametros toales", pytorch_total_params)
     # Hyperparameters
-    epochs = 100
+    # epochs = 100
     learning_rate = 1.0e-3
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
@@ -81,7 +83,7 @@ if __name__ == "__main__":
     TRAINING_START_TIME = time.time()
     virtual_kitty = VirtualKitty(args_parsed["source"], args_parsed["batch_size"])
 
-    for epoch in range(epochs):
+    for epoch in range(args_parsed['epochs']):
         print("############################### EPOCH ", epoch, " ###############################")
         EPOCH_START_TIME = time.time()
         
@@ -101,7 +103,6 @@ if __name__ == "__main__":
             # Train
             optimizer.zero_grad()
             outputs = model(batch)
-            del outputs
             loss = criterion(outputs, targets) 
             epoch_train_losses.append(float(loss))
             loss.backward()
