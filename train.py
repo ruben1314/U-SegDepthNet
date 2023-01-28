@@ -155,7 +155,7 @@ if __name__ == "__main__":
         training_time_stamp = int(EPOCH_END_TIME - TRAINING_START_TIME)
         epoch_time_taken = int(EPOCH_END_TIME - EPOCH_START_TIME)
         ep = f"{epoch+1}".zfill(2)
-        print(f"[{ep}/{epochs}]  TRAIN:{train_avg_loss:.5f})",end="")
+        print(f"[{ep}/{args_parsed['epochs']}]  TRAIN:{train_avg_loss:.5f})",end="")
         if (epoch % args_parsed['print_test'] == 0):
             print(f"TEST:{test_avg_loss:.5f}  AVG_DICE_SCORE:{dice_avg_score:.5f}  AVG_IOU_SCORE:{iou_avg_score:.5f}  TOOK:{epoch_time_taken}s (t:{training_time_stamp}s)")
         
