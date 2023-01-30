@@ -123,8 +123,8 @@ if __name__ == "__main__":
             targets = torch.tensor(targets)
             targets_one_hot = targets > 0
             # Copy to GPU
-            batch = batch.float().cuda()
-            targets = targets_one_hot.float().cuda()
+            batch = batch.float().cuda(device=args_parsed["device"])
+            targets = targets_one_hot.float().cuda(device=args_parsed["device"])
             # Train
             optimizer.zero_grad()
             outputs = model(batch)
@@ -167,8 +167,8 @@ if __name__ == "__main__":
                 targets = torch.tensor(targets)
                 targets_one_hot = targets > 0
                 # Copy to GPU
-                batch = batch.float().cuda()
-                targets = targets_one_hot.float().cuda()
+                batch = batch.float().cuda(device=args_parsed["device"])
+                targets = targets_one_hot.float().cuda(device=args_parsed["device"])
                 # Forward Propagation
                 with torch.no_grad():
                     outputs = model(batch)
