@@ -128,15 +128,15 @@ if __name__ == "__main__":
             # Train
             optimizer.zero_grad()
             outputs = model(batch)
-            if True:
-                for j in range(args_parsed['batch_size']):
-                    # Plot these results
-                    # fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
-                    image = np.zeros((192, 624,15), dtype=np.int8)
-                    for channel in range(15):
-                        predictions = outputs[j,channel].cpu()
-                        mapped_predictions = predictions > 0.75
-                        image[:,:,channel] = mapped_predictions
+            # if True:
+            #     for j in range(args_parsed['batch_size']):
+            #         # Plot these results
+            #         # fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
+            #         image = np.zeros((192, 624,15), dtype=np.int8)
+            #         for channel in range(15):
+            #             predictions = outputs[j,channel].cpu()
+            #             mapped_predictions = predictions > 0.75
+            #             image[:,:,channel] = mapped_predictions
                         # plt.imshow(image[:,:,channel])
                         # plt.waitforbuttonpress()
                     # image_rgb = virtual_kitty.convert_channels_toRGB(image)
