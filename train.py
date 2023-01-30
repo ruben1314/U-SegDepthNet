@@ -2,7 +2,7 @@ import os
 import re
 from UNet.UNed_model import FCN
 import torch
-from pytorchsummary import summary
+# from pytorchsummary import summary
 import time
 import numpy as np
 import argparse
