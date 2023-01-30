@@ -2,6 +2,7 @@ import numpy as np
 import os
 import random
 import cv2 as cv
+import matplotlib.pyplot as plt
 
 class VirtualKitty():
     
@@ -23,6 +24,21 @@ class VirtualKitty():
                         [255,127,80], #Car
                         [0,139,139], #Van
                         [0,0,0]] # Undefined
+        self.name_classes = ["Terrain",
+                             "Sky",
+                             "Tree",
+                             "Vegetation",
+                            "Building",
+                            "Road",
+                            "GuardRail",
+                            "TrafficSign",
+                            "TrafficLight",
+                            "Pole",
+                            "Misc",
+                            "Truck",
+                            "Car",
+                            "Van",
+                            "Undefined"]
 
     def norm(self, image):
         ''' Normalize Image '''
@@ -53,13 +69,10 @@ class VirtualKitty():
         # if shuffle: random.shuffle(samples)
         # Yield samples when batch is full
         i = 0
+        class_by_image = dict()
         lines = lines[:int(len(lines)*max_percent)]
         lines_to_process = len(lines)
         for sample in lines:
-            # sample_dir = os.path.join(base_dir,"images") + os.path.sep + sample
-            # sample_name, _ = os.path.splitext(sample)
-            # sample_name_split = sample_name.split("_")
-            # print("Sample load train", sample_dir   )
             image_seg_path = sample
             image_seg_path = image_seg_path.replace("/rgb/", "/classSegmentation/")
             basename = os.path.basename(image_seg_path)
@@ -70,21 +83,23 @@ class VirtualKitty():
             image_seg_path = os.path.join(image_seg_path,basename)
             image_seg_path = image_seg_path.replace("_rgb/","_classSegmentation/")
             sample = sample.replace("\n","")
-            # print("sample path", sample)
-            # print("Image seg path ", image_seg_path)
-            # print(os.path.exists(sample))
             image = cv.imread(sample)
             image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-            # image = np.pad(image, ((0,5),(0,6),(0,0)), mode='constant', constant_values=0)
-            image = np.resize(image, (image.shape[0]//2, image.shape[1]//2, image.shape[2]))
-            image = np.pad(image, ((0,5),(0,3),(0,0)), mode='constant', constant_values=0)
+            image = cv.resize(image, (624,192), interpolation=cv.INTER_NEAREST)
             image_seg = cv.imread(image_seg_path)
             image_seg = cv.cvtColor(image_seg, cv.COLOR_BGR2RGB)
-            # image_seg = np.pad(image_seg, ((0,9),(0,6),(0,0)), mode='constant', constant_values=0)
-            # image_seg = np.resize(image_seg, (image_seg.shape[0]//2, image_seg.shape[1]//2, image_seg.shape[2]))
-            image_seg_channels = self._get_image_seg_channels(image_seg)
-            image_seg_channels = np.resize(image_seg_channels, (image_seg_channels.shape[0]//2, image_seg_channels.shape[1]//2, image_seg_channels.shape[2]))
-            image_seg_channels = np.pad(image_seg_channels, ((0,5),(0,3),(0,0)), mode='constant', constant_values=0)
+            image_seg_channels, class_by_image = self._get_image_seg_channels(image_seg, class_by_image)
+            image_seg_channels = cv.resize(image_seg_channels, (624,192), interpolation=cv.INTER_NEAREST)
+
+            image_rgb = self.convert_channels_toRGB(image_seg_channels)
+            # plt.figure(1)
+            # plt.imshow(image)
+            # plt.show()
+            # plt.figure(2)
+            # plt.imshow(image_seg_channels[:,:,12])
+            # plt.figure(3)
+            # plt.imshow(image_rgb)
+            # plt.waitforbuttonpress()
             batch[i%batch_size, 0] = self.norm(self.process(image[:,:,0]))
             batch[i%batch_size, 1] = self.norm(self.process(image[:,:,1]))
             batch[i%batch_size, 2] = self.norm(self.process(image[:,:,2]))
@@ -104,17 +119,32 @@ class VirtualKitty():
             targets[i%batch_size, 12] = self.process(image_seg_channels[:,:,12])
             targets[i%batch_size, 13] = self.process(image_seg_channels[:,:,13])
             targets[i%batch_size, 14] = self.process(image_seg_channels[:,:,14])
+            ####### Plot images input to debug errors
+            # plt.subplot(6,3,1)
+            # # print("image", batch[image_batch])
+            # plt.imshow(image)
+            # for channel_index in range(15):
+            #     # print("channel", channel.shape)
+            #     plt.subplot(6,3,channel_index+2)
+            #     plt.imshow(image_seg_channels[:,:,channel_index])
+            # plt.subplot(6,3,17)
+            # plt.imshow(image_rgb)
+            # plt.show()
+            
+            # plt.waitforbuttonpress()
             # Yield when batch is full
             i += 1
             if ((i % print_images_load) == 0) or (i==1):
                 print("Imagenes cargadas", i, "/", lines_to_process, "para Train =", train, "test =", not train)
             if i > 0 and (i%batch_size) == 0:
                 yield batch, targets
+        print("Clases por batches", class_by_image)
+
 
     def load_test(self):
         batch_size = self.batch_size
         # Init
-        batch = np.zeros((batch_size, 3, 384, 1248))
+        batch = np.zeros((batch_size, 3, 192, 624))
         base_dir = self.data_dir
         print("Loading dataset in: ", self.data_dir)
         samples = os.listdir(base_dir)
@@ -128,8 +158,9 @@ class VirtualKitty():
             print("Imagen", sample_dir)
             image = cv.imread(sample_dir)
             image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-            image = np.pad(image, ((0,9),(0,6),(0,0)), mode='constant', constant_values=0)
-            image = np.resize(image, (image.shape[0], image.shape[1], image.shape[2]))
+            image = cv.resize(image, (624,192), interpolation=cv.INTER_NEAREST)
+            # plt.imshow(image)
+            # plt.show()
             batch[i%batch_size, 0] = self.norm(self.process(image[:,:,0]))
             batch[i%batch_size, 1] = self.norm(self.process(image[:,:,1]))
             batch[i%batch_size, 2] = self.norm(self.process(image[:,:,2]))
@@ -138,7 +169,7 @@ class VirtualKitty():
             if i > 0 and (i%batch_size) == 0:
                 yield batch.copy()
 
-    def _get_image_seg_channels(self, image_ori):
+    def _get_image_seg_channels(self, image_ori, class_by_image):
         classes = [[210,0,200], #Terrain
                    [90,200,255], #Sky
                    [0,199,0], #Tree
@@ -161,10 +192,15 @@ class VirtualKitty():
             # chequeo = np.where(image_ori[:,:]==class_seg)
             chequeo = np.where(np.all(image_ori==class_seg, axis=-1))
             image_seg[chequeo[0][:], chequeo[1][:]] = pixel_seg.astype(np.int8)
-        return image_seg
+            if len(chequeo[0]) > 0:
+                try:
+                    class_by_image[self.name_classes[index_class]] += 1
+                except:
+                    class_by_image[self.name_classes[index_class]] = 1
+        return image_seg, class_by_image
     
     def convert_channels_toRGB(self, image):
-        image_RGB = np.zeros((384, 1248,3))
+        image_RGB = np.zeros((192, 624, 3), dtype=np.int16)
         classes = [[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0], #Terrain
                    [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0], #Sky
                    [0,0,1,0,0,0,0,0,0,0,0,0,0,0,0], #Tree
@@ -181,16 +217,10 @@ class VirtualKitty():
                    [0,0,0,0,0,0,0,0,0,0,0,0,0,1,0], #Van
                    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]] # Undefined
         for index_class, output_class in enumerate(classes, start=0):
-            # print("output clases", len(output_class), output_class)
-            # print("Pixel image", image[250,200], image[:,:].shape)
             chequeo = np.where(np.all(image==output_class, axis=-1))
-            # print("chequeo", len(chequeo))
             if len(chequeo[0]) == 0:
                 continue
-            # if len(chequeo[0]) != 0 and index_class != 14:
-                # print("clase distinta undefined", output_class, chequeo)
             image_RGB[chequeo[0][:], chequeo[1][:]] = self.classes[index_class]
-            # print("Max image ", image_RGB.max())
         return image_RGB
 
         

@@ -6,6 +6,7 @@ import os
 import numpy as np
 import cv2 as cv
 from datasets.dataset import VirtualKitty
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-source', '--source', type=str, default="", required=True, help='Path to dataset images')
@@ -29,8 +30,8 @@ if __name__ == "__main__":
     out_channels = 15
     model = FCN(in_channels, out_channels)
     model.load_state_dict(torch.load(args_parsed['model']))
-    model.eval()
-    model.cuda(device=args_parsed['device'])
+    # model.eval()
+    print(model.cuda(device=args_parsed['device']))
     if not os.path.exists("./runs/"):
         os.mkdir("./runs/")
     if not os.path.exists("./runs/detect/"):
@@ -51,6 +52,18 @@ if __name__ == "__main__":
     while batch_has_next:
         try:
             batch = next(batch_it)
+            # ####### Plot images input to debug errors
+            # print("Haceindo cosas de batches", len(batch))
+            # for image_batch_index in range(len(batch)):
+            #     plt.subplot(1,1,1)
+            #     # print("image", batch[image_batch])
+            #     image = np.moveaxis(batch[image_batch_index], 0, 2)
+
+            #     plt.imshow(image)
+            #     # plt.imshow(image_rgb)
+            #     plt.show()
+
+            ###################### end debug images ###############################
         # for batch in next(batch_it):
             batch = torch.tensor(batch)
             # Copy to GPU
@@ -60,20 +73,22 @@ if __name__ == "__main__":
             with torch.no_grad():
                 outputs = model(batch)
             # Plot Outputs
-            
             for j in range(args_parsed['batch_size']):
                 # Plot these results
                 # fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
-                image = np.zeros((384, 1248,15), dtype=np.int8)
+                image = np.zeros((192, 624,15), dtype=np.int8)
                 for channel in range(15):
                     predictions = outputs[j,channel].cpu()
                     mapped_predictions = predictions > 0.75
                     image[:,:,channel] = mapped_predictions
-                    # ax[channel%3][channel%5].imshow(mapped_predictions, cmap=cm)
-                    # ax[channel%3][channel%5].set_title("image")
+                    # plt.imshow(image[:,:,channel])
+                    # plt.waitforbuttonpress()
                 image_rgb = virtual_kitty.convert_channels_toRGB(image)
+                # print("Image rgb channels", image_rgb.shape)
                 # OpenCV needs BGR
                 image_BGR = cv.cvtColor(np.float32(image_rgb), cv.COLOR_RGB2BGR)
+                # plt.imshow(image_rgb)
+                # plt.waitforbuttonpress()
                 cv.imwrite(args_parsed['output'] + "output" + os.path.sep + "SAMPLE_" + str(i) + "_BATCH_SAMPLE_" + str(j) + ".jpg", image_BGR)
                 #plt.show()
             # Clear Cache

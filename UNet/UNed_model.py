@@ -73,58 +73,40 @@ class FCN(nn.Module):
         # Encoder
         
         dc1 = self.dc1(x)
-        del x
         dp1 = self.dp1(dc1)
         
         dc2 = self.dc2(dp1)
-        del dp1
         dp2 = self.dp2(dc2)
         
         dc3 = self.dc3(dp2)
-        del dp2
         dp3 = self.dp3(dc3)
         
         dc4 = self.dc4(dp3)
-        del dp3
         dp4 = self.dp4(dc4)
         
         dc5 = self.dc5(dp4) # Lowest block
-        del dp4
         
         # Decoder
         
         up4 = self.up4(dc5)
-        del dc5
         cat = torch.cat([up4, dc4], dim=1)
-        del up4
-        del dc4
         uc4 = self.uc4(cat)
         
         up3 = self.up3(uc4)
-        del uc4
         cat = torch.cat([up3, dc3], dim=1)
-        del up3
-        del dc3
         uc3 = self.uc3(cat)
 
         up2 = self.up2(uc3)
-        del uc3
         cat = torch.cat([up2, dc2], dim=1)
-        del up2
-        del dc2
         uc2 = self.uc2(cat)
 
         up1 = self.up1(uc2)
-        del uc2
         cat = torch.cat([up1, dc1], dim=1)
-        del up1
-        del dc1
         uc1 = self.uc1(cat)
         
         # Final Convolution Layer
         
         out = self.fc(uc1)
-        del uc1
         out = self.sigmoid(out)
         
         return out

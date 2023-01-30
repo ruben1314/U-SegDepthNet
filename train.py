@@ -6,7 +6,9 @@ from pytorchsummary import summary
 import time
 import numpy as np
 import argparse
+import matplotlib.pyplot as plt
 from datasets.dataset import VirtualKitty
+import cv2 as cv
 
 def IOU(preds, targets, smooth=0.001):
     preds = preds.view(-1)
@@ -68,7 +70,7 @@ if __name__ == "__main__":
     print("Numero de parametros toales", pytorch_total_params)
     # Hyperparameters
     # epochs = 100
-    learning_rate = 1.0e-3
+    learning_rate = 1.0e-4
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
     # Setting up a global loss function
@@ -79,7 +81,12 @@ if __name__ == "__main__":
     # Additional metrics
     avg_iou_scores = []
     avg_dice_scores = []
-
+    len_runs_training = 0 
+    try:
+        len_runs_training = len(os.listdir("./runs/train/"))
+    except:
+        print("No runs")
+    os.makedirs("./runs/train/run" + str(len_runs_training+1))
     TRAINING_START_TIME = time.time()
     virtual_kitty = VirtualKitty(args_parsed["source"], args_parsed["batch_size"])
 
@@ -91,8 +98,26 @@ if __name__ == "__main__":
         epoch_test_losses = []
         epoch_iou_scores = [] # Computed only on test set
         epoch_dice_scores = [] # Computed only on test set
-        
+        i = 0
         for batch, targets in virtual_kitty.load_train(max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
+            # ####### Plot images input to debug errors
+            # print("Haceindo cosas de batches", len(batch))
+            # for image_batch_index in range(len(batch)):
+            #     plt.subplot(6,3,1)
+            #     # print("image", batch[image_batch])
+            #     image = np.moveaxis(batch[image_batch_index], 0, 2)
+
+            #     plt.imshow(image)
+            #     for channel_index in range(15):
+            #         # print("channel", channel.shape)
+            #         plt.subplot(6,3,channel_index+2)
+            #         image_seg = np.moveaxis(targets[image_batch_index], 0, 2)
+            #         plt.imshow(image_seg[:,:,channel_index])
+            #     plt.subplot(6,3,17)
+            #     # plt.imshow(image_rgb)
+            #     plt.show()
+
+            ###################### end debug images ###############################
             # Convert samples to one-hot form
             batch = torch.tensor(batch)
             targets = torch.tensor(targets)
@@ -103,6 +128,27 @@ if __name__ == "__main__":
             # Train
             optimizer.zero_grad()
             outputs = model(batch)
+            if True:
+                for j in range(args_parsed['batch_size']):
+                    # Plot these results
+                    # fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
+                    image = np.zeros((192, 624,15), dtype=np.int8)
+                    for channel in range(15):
+                        predictions = outputs[j,channel].cpu()
+                        mapped_predictions = predictions > 0.75
+                        image[:,:,channel] = mapped_predictions
+                        # plt.imshow(image[:,:,channel])
+                        # plt.waitforbuttonpress()
+                    # image_rgb = virtual_kitty.convert_channels_toRGB(image)
+                    # print("Image rgb channels", image_rgb.shape)
+                    # OpenCV needs BGR
+                    # image_BGR = cv.cvtColor(np.float32(image_rgb), cv.COLOR_RGB2BGR)
+                    # plt.imshow(image_rgb)
+                    # plt.waitforbuttonpress()
+                    # print("Creando ","./runs/train/run" + str(len_runs_training+1) + "/epoca" + str(epoch))
+                    # os.makedirs("./runs/train/run" + str(len_runs_training+1) + "/epoca" + str(epoch), exist_ok=True)
+                    # print("Ruta imagen", )
+                    # cv.imwrite("./runs/train/run" + str(len_runs_training+1) + "/epoca" + str(epoch) + os.path.sep + "SAMPLE_" + str(i) + "_BATCH_SAMPLE_" + str(j) + ".jpg", image_BGR)
             loss = criterion(outputs, targets) 
             epoch_train_losses.append(float(loss))
             loss.backward()
@@ -112,7 +158,8 @@ if __name__ == "__main__":
             del targets
             del outputs
             torch.cuda.empty_cache()
-        
+            i += 1
+
         if (epoch % args_parsed['print_test']) == 0:
             for batch, targets in virtual_kitty.load_train(train=False,max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
                 # Convert samples to one-hot form
@@ -139,11 +186,11 @@ if __name__ == "__main__":
                 torch.cuda.empty_cache()
             test_avg_loss = np.average(epoch_test_losses)
             iou_avg_score = np.average(epoch_iou_scores)
-            dice_avg_score = np.average(epoch_dice_scores)
+            # dice_avg_score = np.average(epoch_dice_scores)
 
             test_avg_losses.append(test_avg_loss)
             avg_iou_scores.append(iou_avg_score)
-            avg_dice_scores.append(dice_avg_score)
+            # avg_dice_scores.append(dice_avg_score)
 
                 
         EPOCH_END_TIME = time.time()
@@ -155,9 +202,10 @@ if __name__ == "__main__":
         training_time_stamp = int(EPOCH_END_TIME - TRAINING_START_TIME)
         epoch_time_taken = int(EPOCH_END_TIME - EPOCH_START_TIME)
         ep = f"{epoch+1}".zfill(2)
-        print(f"[{ep}/{args_parsed['epochs']}]  TRAIN:{train_avg_loss:.5f})",end="")
+        print(f"[{ep}/{args_parsed['epochs']}]  TOOK:{epoch_time_taken}s (TOTAL:{training_time_stamp}s TRAIN:{train_avg_loss:.5f}",end="")
         if (epoch % args_parsed['print_test'] == 0):
-            print(f"TEST:{test_avg_loss:.5f}  AVG_DICE_SCORE:{dice_avg_score:.5f}  AVG_IOU_SCORE:{iou_avg_score:.5f}  TOOK:{epoch_time_taken}s (t:{training_time_stamp}s)")
+            print(f" TEST:{test_avg_loss:.5f}  AVG_IOU_SCORE:{iou_avg_score:.5f}", end="")
+        print(")")
         
         # Save the model every 10 epochs
         if ((epoch+1) % 10) == 0:
