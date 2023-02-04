@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 class VirtualKitty():
     
-    def __init__(self, data_dir, batch_size=4):
+    def __init__(self, data_dir="", batch_size=4):
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.classes = [[210,0,200], #Terrain
@@ -54,7 +54,6 @@ class VirtualKitty():
         # Init
         batch = np.zeros((batch_size, 3, 192, 624))
         targets = np.zeros((batch_size, 15, 192, 624))
-        base_dir = self.data_dir
         if train:
             with open("./datasets/train.txt" , 'r') as f:
                 lines = f.readlines()

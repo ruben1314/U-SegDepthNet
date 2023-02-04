@@ -9,6 +9,8 @@ import argparse
 import matplotlib.pyplot as plt
 from datasets.dataset import VirtualKitty
 import cv2 as cv
+from torch.utils.tensorboard import SummaryWriter
+
 
 def IOU(preds, targets, smooth=0.001):
     preds = preds.view(-1)
@@ -33,7 +35,6 @@ def FocalTverskyLoss(predictions, targets, alpha=0.7, beta=0.3, gamma=4/3, smoot
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-source', '--source', type=str, default="", required=True, help='Path to dataset images')
     parser.add_argument('-output', '--output', type=str, default="", required=True, help='Path to model output')
     parser.add_argument('-device', '--device', type=int, default=0, required=True, help='Device GPU to execute')
     parser.add_argument('-batch_size', '--batch_size', type=int, default=1, required=True, help='Batch size to train')
@@ -43,7 +44,6 @@ def parse_args():
     parser.add_argument('-print_images_load', '--print_images_load', type=int, default=100, required=False, help='Images load to print percent')
     parser.add_argument('-epochs', '--epochs', type=int, default=100, required=False, help='Epochs to train. Default:100')
     args = parser.parse_args()
-    args_parsed['source'] = args.source
     args_parsed['output'] = args.output
     args_parsed['device'] = args.device
     args_parsed['batch_size'] = args.batch_size
@@ -88,8 +88,8 @@ if __name__ == "__main__":
         print("No runs")
     os.makedirs("./runs/train/run" + str(len_runs_training+1))
     TRAINING_START_TIME = time.time()
-    virtual_kitty = VirtualKitty(args_parsed["source"], args_parsed["batch_size"])
-
+    virtual_kitty = VirtualKitty(batch_size=args_parsed["batch_size"])
+    writer = SummaryWriter()
     for epoch in range(args_parsed['epochs']):
         print("############################### EPOCH ", epoch, " ###############################")
         EPOCH_START_TIME = time.time()
@@ -98,6 +98,7 @@ if __name__ == "__main__":
         epoch_test_losses = []
         epoch_iou_scores = [] # Computed only on test set
         epoch_dice_scores = [] # Computed only on test set
+        epoch_iou_train_scores = []
         i = 0
         for batch, targets in virtual_kitty.load_train(max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
             # ####### Plot images input to debug errors
@@ -128,6 +129,11 @@ if __name__ == "__main__":
             # Train
             optimizer.zero_grad()
             outputs = model(batch)
+            with torch.no_grad():
+                    predictions = outputs.cpu() > 0.75
+                    iou_score = float(IOU(predictions, targets_one_hot))
+                    epoch_iou_train_scores.append(iou_score)
+                    # epoch_dice_scores.append(dice_score)
             # if True:
             #     for j in range(args_parsed['batch_size']):
             #         # Plot these results
@@ -191,6 +197,12 @@ if __name__ == "__main__":
             test_avg_losses.append(test_avg_loss)
             avg_iou_scores.append(iou_avg_score)
             # avg_dice_scores.append(dice_avg_score)
+
+        # for n_iter in range(100):
+        writer.add_scalar('Loss/train', np.average(epoch_train_losses), epoch)
+        writer.add_scalar('Loss/test',test_avg_loss, epoch)
+        writer.add_scalar('Accuracy/train', np.average(epoch_iou_train_scores), epoch)
+        writer.add_scalar('Accuracy/test', iou_avg_score, epoch)
 
                 
         EPOCH_END_TIME = time.time()
