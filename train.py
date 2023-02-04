@@ -59,7 +59,7 @@ if __name__ == "__main__":
     args_parsed = dict()
     parse_args()
     in_channels = 3
-    out_channels = 15
+    out_channels = 16
     model = FCN(in_channels, out_channels)
     if args_parsed['model'] != "":
         model.load_state_dict(torch.load(args_parsed['model']))

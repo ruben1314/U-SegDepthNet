@@ -53,7 +53,7 @@ class VirtualKitty():
         batch_size = self.batch_size
         # Init
         batch = np.zeros((batch_size, 3, 192, 624))
-        targets = np.zeros((batch_size, 15, 192, 624))
+        targets = np.zeros((batch_size, 16, 192, 624))
         if train:
             with open("./datasets/train.txt" , 'r') as f:
                 lines = f.readlines()
@@ -82,6 +82,17 @@ class VirtualKitty():
             image_seg_path = os.path.join(image_seg_path,basename)
             image_seg_path = image_seg_path.replace("_rgb/","_classSegmentation/")
             sample = sample.replace("\n","")
+
+            image_depth_path = sample
+            image_depth_path = image_depth_path.replace("/rgb/", "/depth/")
+            basename = os.path.basename(image_depth_path)
+            image_depth_path = image_depth_path.replace(basename,"")
+            file_name, ext = os.path.splitext(basename)
+            file_name_splitted = file_name.split("_")
+            basename = "depth_" + file_name_splitted[-1] + ".png"
+            image_depth_path = os.path.join(image_depth_path,basename)
+            image_depth_path = image_depth_path.replace("_rgb/","_depth/")
+
             image = cv.imread(sample)
             image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
             image = cv.resize(image, (624,192), interpolation=cv.INTER_NEAREST)
@@ -89,8 +100,11 @@ class VirtualKitty():
             image_seg = cv.cvtColor(image_seg, cv.COLOR_BGR2RGB)
             image_seg_channels, class_by_image = self._get_image_seg_channels(image_seg, class_by_image)
             image_seg_channels = cv.resize(image_seg_channels, (624,192), interpolation=cv.INTER_NEAREST)
+            image_depth = cv.imread(image_depth_path, cv.IMREAD_GRAYSCALE)
+            image_depth = cv.resize(image_depth, (624,192), interpolation=cv.INTER_NEAREST)
 
-            image_rgb = self.convert_channels_toRGB(image_seg_channels)
+
+            # image_rgb = self.convert_channels_toRGB(image_seg_channels)
             # plt.figure(1)
             # plt.imshow(image)
             # plt.show()
@@ -118,6 +132,7 @@ class VirtualKitty():
             targets[i%batch_size, 12] = self.process(image_seg_channels[:,:,12])
             targets[i%batch_size, 13] = self.process(image_seg_channels[:,:,13])
             targets[i%batch_size, 14] = self.process(image_seg_channels[:,:,14])
+            targets[i%batch_size, 15] = self.process(image_depth[:,:])
             ####### Plot images input to debug errors
             # plt.subplot(6,3,1)
             # # print("image", batch[image_batch])
