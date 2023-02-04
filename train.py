@@ -199,8 +199,8 @@ if __name__ == "__main__":
             # avg_dice_scores.append(dice_avg_score)
 
         # for n_iter in range(100):
-        writer.add_scalar('Loss/train', np.average(epoch_train_losses), epoch)
         writer.add_scalar('Loss/test',test_avg_loss, epoch)
+        writer.add_scalar('Loss/train', np.average(epoch_train_losses), epoch)
         writer.add_scalar('Accuracy/train', np.average(epoch_iou_train_scores), epoch)
         writer.add_scalar('Accuracy/test', iou_avg_score, epoch)
 
