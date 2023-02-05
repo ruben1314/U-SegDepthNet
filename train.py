@@ -70,7 +70,7 @@ if __name__ == "__main__":
     print("Numero de parametros toales", pytorch_total_params)
     # Hyperparameters
     # epochs = 100
-    learning_rate = 1.0e-4
+    learning_rate = 1.0e-3
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
     # Setting up a global loss function
@@ -199,10 +199,11 @@ if __name__ == "__main__":
             # avg_dice_scores.append(dice_avg_score)
 
         # for n_iter in range(100):
-        writer.add_scalar('Loss/test',test_avg_loss, epoch)
+        if (epoch % args_parsed['print_test']) == 0:
+            writer.add_scalar('Loss/test',test_avg_loss, epoch)
+            writer.add_scalar('Accuracy/test', iou_avg_score, epoch)
         writer.add_scalar('Loss/train', np.average(epoch_train_losses), epoch)
         writer.add_scalar('Accuracy/train', np.average(epoch_iou_train_scores), epoch)
-        writer.add_scalar('Accuracy/test', iou_avg_score, epoch)
 
                 
         EPOCH_END_TIME = time.time()

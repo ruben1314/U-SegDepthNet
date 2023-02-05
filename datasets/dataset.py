@@ -43,6 +43,10 @@ class VirtualKitty():
     def norm(self, image):
         ''' Normalize Image '''
         return (image - np.min(image)) / (np.max(image) - np.min(image))
+    
+    def convert_range_image(self, image):
+        # return image * (pow(2,16) -1)
+        return image * 255
         
     def process(self, sample):
         ''' Resize sample to the given size '''
@@ -52,8 +56,8 @@ class VirtualKitty():
     def load_train(self, train=True, shuffle=True, max_percent=1, print_images_load=100):
         batch_size = self.batch_size
         # Init
-        batch = np.zeros((batch_size, 3, 192, 624))
-        targets = np.zeros((batch_size, 16, 192, 624))
+        batch = np.zeros((batch_size, 3, 192, 624),dtype=np.float16)
+        targets = np.zeros((batch_size, 16, 192, 624), dtype=np.float32)
         if train:
             with open("./datasets/train.txt" , 'r') as f:
                 lines = f.readlines()
@@ -100,9 +104,12 @@ class VirtualKitty():
             image_seg = cv.cvtColor(image_seg, cv.COLOR_BGR2RGB)
             image_seg_channels, class_by_image = self._get_image_seg_channels(image_seg, class_by_image)
             image_seg_channels = cv.resize(image_seg_channels, (624,192), interpolation=cv.INTER_NEAREST)
-            image_depth = cv.imread(image_depth_path, cv.IMREAD_GRAYSCALE)
+            image_depth = cv.imread(image_depth_path, cv.IMREAD_ANYCOLOR | cv.IMREAD_ANYDEPTH)
             image_depth = cv.resize(image_depth, (624,192), interpolation=cv.INTER_NEAREST)
-
+            # print("image_depth min", np.min(image_depth), "max", np.max(image_depth))
+            # print("image depth", image_depth.dtype)
+            # plt.imshow(image_depth, cmap='gray')
+            # plt.waitforbuttonpress()
 
             # image_rgb = self.convert_channels_toRGB(image_seg_channels)
             # plt.figure(1)
@@ -132,7 +139,9 @@ class VirtualKitty():
             targets[i%batch_size, 12] = self.process(image_seg_channels[:,:,12])
             targets[i%batch_size, 13] = self.process(image_seg_channels[:,:,13])
             targets[i%batch_size, 14] = self.process(image_seg_channels[:,:,14])
-            targets[i%batch_size, 15] = self.process(image_depth[:,:])
+            targets[i%batch_size, 15] = self.norm(image_depth[:,:])
+
+            # print("Targets", np.min(targets[i%batch_size,15]), "max", np.max(targets[i%batch_size,15]), np.average(targets[i%batch_size, 15]))
             ####### Plot images input to debug errors
             # plt.subplot(6,3,1)
             # # print("image", batch[image_batch])
