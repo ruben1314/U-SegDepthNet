@@ -154,19 +154,23 @@ if __name__ == "__main__":
             # Convert samples to one-hot form
             batch = torch.tensor(batch)
             targets = torch.tensor(targets)
-            targets_one_hot = targets > 0
+            if seg_image:
+                targets_one_hot = targets[:,:15] > 0
             # Copy to GPU
             batch = batch.float().cuda(device=args_parsed["device"])
-            targets = targets_one_hot.float().cuda(device=args_parsed["device"])
+            if seg_image:
+                targets[:,:15] = targets_one_hot.float()
+            targets = targets.cuda(device=args_parsed["device"])
             # Train
             optimizer.zero_grad()
             outputs = model(batch)
             with torch.no_grad():
-                    predictions = outputs.cpu() > 0.75
-                    iou_score = float(IOU(predictions, targets_one_hot))
-                    # accuracy(predictions[:,:15], targets[:,:15].cpu(),args_parsed['batch_size'])
-                    epoch_iou_train_scores.append(iou_score)
-                    # epoch_dice_scores.append(dice_score)
+                    if seg_image:
+                        predictions = outputs.cpu() > 0.75
+                        iou_score = float(IOU(predictions, targets_one_hot))
+                        # accuracy(predictions[:,:15], targets[:,:15].cpu(),args_parsed['batch_size'])
+                        epoch_iou_train_scores.append(iou_score)
+                        # epoch_dice_scores.append(dice_score)
             # if True:
             #     for j in range(args_parsed['batch_size']):
             #         # Plot these results
@@ -193,6 +197,7 @@ if __name__ == "__main__":
             loss_depth = 0
             if seg_image:
                 loss_seg = criterion(outputs[:,:15], targets[:,:15]) 
+            print("Outputs", outputs.shape,"targets", targets.shape)
             if depth_image:
                 loss_depth = mse_loss(outputs[:,-1],targets[:,-1])
             loss = loss_seg + loss_depth
