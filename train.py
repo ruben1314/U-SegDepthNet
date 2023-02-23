@@ -2,6 +2,8 @@ import os
 import re
 from UNet.UNed_model import FCN
 import torch
+from torch.nn import CrossEntropyLoss
+from torch.nn import MSELoss
 # from pytorchsummary import summary
 import time
 import numpy as np
@@ -32,6 +34,25 @@ def FocalTverskyLoss(predictions, targets, alpha=0.7, beta=0.3, gamma=4/3, smoot
     FocalTversky = (1 - Tversky) ** gamma
     return FocalTversky
 
+def accuracy(predictions, targets, batch_size):
+    predictions = torch.moveaxis(predictions,1,3)
+    targets = torch.moveaxis(targets,1,3)
+    accuracy = []
+    for i in range(batch_size):
+        tensor_shape = predictions.shape
+        # print("tensor shape", tensor_shape, predictions[i].shape,targets[i].shape)
+        hits = predictions[i]==targets[i]
+        print("hits ", hits.shape)
+        trues = np.ones(tensor_shape[3], dtype=bool)
+        # print("trues", trues)
+        print(np.all(hits==trues, axis=-1))
+        hits_trues = np.where(np.all(hits==trues, axis=-1))
+        # print("hits ", hits_trues)
+        hits_sum = len(hits_trues[0])
+        accuracy.append((hits_sum*100) / (tensor_shape[2]*tensor_shape[1]))
+        # print("accuracy percent", (hits_sum*100) / (tensor_shape[2]*tensor_shape[1]))
+    print("average accuracy ", np.average(accuracy))
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -59,7 +80,16 @@ if __name__ == "__main__":
     args_parsed = dict()
     parse_args()
     in_channels = 3
-    out_channels = 16
+    out_channels = 1
+    seg_image = False
+    depth_image = False
+    if out_channels == 1:
+        depth_image = True
+    elif out_channels == 15:
+        seg_image = True
+    elif out_channels == 16:
+        seg_image = True
+        depth_image = True
     model = FCN(in_channels, out_channels)
     if args_parsed['model'] != "":
         model.load_state_dict(torch.load(args_parsed['model']))
@@ -71,11 +101,11 @@ if __name__ == "__main__":
     # Hyperparameters
     # epochs = 100
     learning_rate = 1.0e-3
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-1)
 
     # Setting up a global loss function
     criterion = FocalTverskyLoss
-
+    mse_loss = MSELoss()
     train_avg_losses = []
     test_avg_losses = []
     # Additional metrics
@@ -88,7 +118,7 @@ if __name__ == "__main__":
         print("No runs")
     os.makedirs("./runs/train/run" + str(len_runs_training+1))
     TRAINING_START_TIME = time.time()
-    virtual_kitty = VirtualKitty(batch_size=args_parsed["batch_size"])
+    virtual_kitty = VirtualKitty(batch_size=args_parsed["batch_size"], seg_image=seg_image, depth_image=depth_image, output_classes=out_channels)
     writer = SummaryWriter()
     for epoch in range(args_parsed['epochs']):
         print("############################### EPOCH ", epoch, " ###############################")
@@ -132,6 +162,7 @@ if __name__ == "__main__":
             with torch.no_grad():
                     predictions = outputs.cpu() > 0.75
                     iou_score = float(IOU(predictions, targets_one_hot))
+                    # accuracy(predictions[:,:15], targets[:,:15].cpu(),args_parsed['batch_size'])
                     epoch_iou_train_scores.append(iou_score)
                     # epoch_dice_scores.append(dice_score)
             # if True:
@@ -155,7 +186,16 @@ if __name__ == "__main__":
                     # os.makedirs("./runs/train/run" + str(len_runs_training+1) + "/epoca" + str(epoch), exist_ok=True)
                     # print("Ruta imagen", )
                     # cv.imwrite("./runs/train/run" + str(len_runs_training+1) + "/epoca" + str(epoch) + os.path.sep + "SAMPLE_" + str(i) + "_BATCH_SAMPLE_" + str(j) + ".jpg", image_BGR)
-            loss = criterion(outputs, targets) 
+            loss_seg = 0
+            loss_depth = 0
+            if seg_image:
+                loss_seg = criterion(outputs[:,:15], targets[:,:15]) 
+            if depth_image:
+                loss_depth = mse_loss(outputs[:,-1],targets[:,-1])
+            loss = loss_seg + loss_depth
+            # TODO MSE depth sumar perdidas, 
+            # TODO separa funcion activacion para seg y depth seg --> sftmax, depth --> sigmoid
+            # TODO hacer solo profundidad
             epoch_train_losses.append(float(loss))
             loss.backward()
             optimizer.step()
@@ -202,8 +242,9 @@ if __name__ == "__main__":
         if (epoch % args_parsed['print_test']) == 0:
             writer.add_scalar('Loss/test',test_avg_loss, epoch)
             writer.add_scalar('Accuracy/test', iou_avg_score, epoch)
-        writer.add_scalar('Loss/train', np.average(epoch_train_losses), epoch)
-        writer.add_scalar('Accuracy/train', np.average(epoch_iou_train_scores), epoch)
+        writer.add_scalar('Loss/train_seg', loss_seg, epoch)
+        writer.add_scalar('Loss/train_depth', loss_depth, epoch)
+        writer.add_scalar('Accuracy/train', iou_score, epoch)
 
                 
         EPOCH_END_TIME = time.time()

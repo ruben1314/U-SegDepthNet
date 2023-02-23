@@ -67,6 +67,7 @@ class FCN(nn.Module):
         # Final Convolutional layer
         self.fc = nn.Conv2d(64, out_channels, kernel_size=1, stride=1, padding=0, bias=True)
         self.sigmoid = nn.Sigmoid()
+        self.soft_max = nn.Softmax2d()
 
     def forward(self, x):
         
@@ -107,6 +108,12 @@ class FCN(nn.Module):
         # Final Convolution Layer
         
         out = self.fc(uc1)
-        out = self.sigmoid(out)
+        if self.out_channels >= 16:
+            out[:,:15] = self.soft_max(out[:,:15])
+            out[:,15] = self.sigmoid(out[:,15])
+        elif self.out_channels == 1:
+            out[:,0] = self.sigmoid(out[:,0])
+        elif self.out_channels == 15:
+            out[:,:15] = self.soft_max(out[:,:15])
         
         return out

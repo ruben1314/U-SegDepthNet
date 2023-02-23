@@ -27,7 +27,16 @@ if __name__ == "__main__":
     args_parsed = dict()
     parse_args()
     in_channels = 3
-    out_channels = 16
+    out_channels = 1
+    seg_image = False
+    depth_image = False
+    if out_channels == 1:
+        depth_image = True
+    elif out_channels == 15:
+        seg_image = True
+    elif out_channels == 16:
+        seg_image = True
+        depth_image = True
     model = FCN(in_channels, out_channels)
     model.load_state_dict(torch.load(args_parsed['model']))
     # model.eval()
@@ -78,25 +87,29 @@ if __name__ == "__main__":
                 # fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
                 image = np.zeros((192, 624,15), dtype=np.int8)
                 image_depth = np.zeros((192,624), dtype=np.float32)
-                for channel in range(15):
-                    predictions = outputs[j,channel].cpu()
-                    mapped_predictions = predictions > 0.75
-                    image[:,:,channel] = mapped_predictions
-                    # plt.imshow(image[:,:,channel])
-                    # plt.waitforbuttonpress()
-                image_rgb = virtual_kitty.convert_channels_toRGB(image)
-                # print("Image rgb channels", image_rgb.shape)
-                # OpenCV needs BGR
-                image_BGR = cv.cvtColor(np.float32(image_rgb), cv.COLOR_RGB2BGR)
+                if seg_image:
+                    for channel in range(15):
+                        predictions = outputs[j,channel].cpu()
+                        mapped_predictions = predictions > 0.75
+                        image[:,:,channel] = mapped_predictions
+                        # plt.imshow(image[:,:,channel])
+                        # plt.waitforbuttonpress()
+                    image_rgb = virtual_kitty.convert_channels_toRGB(image)
+                    # print("Image rgb channels", image_rgb.shape)
+                    # OpenCV needs BGR
+                    image_BGR = cv.cvtColor(np.float32(image_rgb), cv.COLOR_RGB2BGR)
                 # print(np.min(np.array(outputs[j,15].cpu())), np.max(np.array(outputs[j,15].cpu())), "shape", outputs[j,15].cpu().shape)
-                image_depth_norm = virtual_kitty.norm(np.array(outputs[j,15].cpu()))
-                # print("image_depth min", np.min(image_depth_norm), "max", np.max(image_depth_norm))
-                image_depth = virtual_kitty.convert_range_image(image_depth_norm)
+                if depth_image:
+                    image_depth_norm = virtual_kitty.norm(np.array(outputs[j,-1].cpu()))
+                    # print("image_depth min", np.min(image_depth_norm), "max", np.max(image_depth_norm))
+                    image_depth = virtual_kitty.convert_range_image(image_depth_norm)
                 # print("image_depth min", np.min(image_depth), "max", np.max(image_depth))
                 # plt.imshow(image_depth, cmap='gray')
                 # plt.waitforbuttonpress()
-                cv.imwrite(args_parsed['output'] + "output" + os.path.sep + "SEG_SAMPLE_" + str(i) + "_BATCH_SAMPLE_" + str(j) + ".jpg", image_BGR)
-                cv.imwrite(args_parsed['output'] + "output" + os.path.sep + "DEPTH_SAMPLE_" + str(i) + "_BATCH_SAMPLE_" + str(j) + ".jpg", image_depth)
+                if seg_image:
+                    cv.imwrite(args_parsed['output'] + "output" + os.path.sep + "SEG_SAMPLE_" + str(i) + "_BATCH_SAMPLE_" + str(j) + ".jpg", image_BGR)
+                if depth_image:
+                    cv.imwrite(args_parsed['output'] + "output" + os.path.sep + "DEPTH_SAMPLE_" + str(i) + "_BATCH_SAMPLE_" + str(j) + ".jpg", image_depth)
                 #plt.show()
             # Clear Cache
             del batch

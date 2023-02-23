@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 class VirtualKitty():
     
-    def __init__(self, data_dir="", batch_size=4):
+    def __init__(self, data_dir="", batch_size=4, seg_image=False, depth_image=False, output_classes=16):
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.classes = [[210,0,200], #Terrain
@@ -39,6 +39,9 @@ class VirtualKitty():
                             "Car",
                             "Van",
                             "Undefined"]
+        self.seg_image = seg_image
+        self.depth_image = depth_image
+        self.output_classes = output_classes
 
     def norm(self, image):
         ''' Normalize Image '''
@@ -57,7 +60,7 @@ class VirtualKitty():
         batch_size = self.batch_size
         # Init
         batch = np.zeros((batch_size, 3, 192, 624),dtype=np.float16)
-        targets = np.zeros((batch_size, 16, 192, 624), dtype=np.float32)
+        targets = np.zeros((batch_size, self.output_classes, 192, 624), dtype=np.float32)
         if train:
             with open("./datasets/train.txt" , 'r') as f:
                 lines = f.readlines()
@@ -76,36 +79,39 @@ class VirtualKitty():
         lines = lines[:int(len(lines)*max_percent)]
         lines_to_process = len(lines)
         for sample in lines:
-            image_seg_path = sample
-            image_seg_path = image_seg_path.replace("/rgb/", "/classSegmentation/")
-            basename = os.path.basename(image_seg_path)
-            image_seg_path = image_seg_path.replace(basename,"")
-            file_name, ext = os.path.splitext(basename)
-            file_name_splitted = file_name.split("_")
-            basename = "classgt_" + file_name_splitted[-1] + ".png"
-            image_seg_path = os.path.join(image_seg_path,basename)
-            image_seg_path = image_seg_path.replace("_rgb/","_classSegmentation/")
+            if self.seg_image:
+                image_seg_path = sample
+                image_seg_path = image_seg_path.replace("/rgb/", "/classSegmentation/")
+                basename = os.path.basename(image_seg_path)
+                image_seg_path = image_seg_path.replace(basename,"")
+                file_name, ext = os.path.splitext(basename)
+                file_name_splitted = file_name.split("_")
+                basename = "classgt_" + file_name_splitted[-1] + ".png"
+                image_seg_path = os.path.join(image_seg_path,basename)
+                image_seg_path = image_seg_path.replace("_rgb/","_classSegmentation/")
             sample = sample.replace("\n","")
-
-            image_depth_path = sample
-            image_depth_path = image_depth_path.replace("/rgb/", "/depth/")
-            basename = os.path.basename(image_depth_path)
-            image_depth_path = image_depth_path.replace(basename,"")
-            file_name, ext = os.path.splitext(basename)
-            file_name_splitted = file_name.split("_")
-            basename = "depth_" + file_name_splitted[-1] + ".png"
-            image_depth_path = os.path.join(image_depth_path,basename)
-            image_depth_path = image_depth_path.replace("_rgb/","_depth/")
+            if self.depth_image:
+                image_depth_path = sample
+                image_depth_path = image_depth_path.replace("/rgb/", "/depth/")
+                basename = os.path.basename(image_depth_path)
+                image_depth_path = image_depth_path.replace(basename,"")
+                file_name, ext = os.path.splitext(basename)
+                file_name_splitted = file_name.split("_")
+                basename = "depth_" + file_name_splitted[-1] + ".png"
+                image_depth_path = os.path.join(image_depth_path,basename)
+                image_depth_path = image_depth_path.replace("_rgb/","_depth/")
 
             image = cv.imread(sample)
             image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
             image = cv.resize(image, (624,192), interpolation=cv.INTER_NEAREST)
-            image_seg = cv.imread(image_seg_path)
-            image_seg = cv.cvtColor(image_seg, cv.COLOR_BGR2RGB)
-            image_seg_channels, class_by_image = self._get_image_seg_channels(image_seg, class_by_image)
-            image_seg_channels = cv.resize(image_seg_channels, (624,192), interpolation=cv.INTER_NEAREST)
-            image_depth = cv.imread(image_depth_path, cv.IMREAD_ANYCOLOR | cv.IMREAD_ANYDEPTH)
-            image_depth = cv.resize(image_depth, (624,192), interpolation=cv.INTER_NEAREST)
+            if self.seg_image:
+                image_seg = cv.imread(image_seg_path)
+                image_seg = cv.cvtColor(image_seg, cv.COLOR_BGR2RGB)
+                image_seg_channels, class_by_image = self._get_image_seg_channels(image_seg, class_by_image)
+                image_seg_channels = cv.resize(image_seg_channels, (624,192), interpolation=cv.INTER_NEAREST)
+            if self.depth_image:
+                image_depth = cv.imread(image_depth_path, cv.IMREAD_ANYCOLOR | cv.IMREAD_ANYDEPTH)
+                image_depth = cv.resize(image_depth, (624,192), interpolation=cv.INTER_NEAREST)
             # print("image_depth min", np.min(image_depth), "max", np.max(image_depth))
             # print("image depth", image_depth.dtype)
             # plt.imshow(image_depth, cmap='gray')
@@ -123,23 +129,24 @@ class VirtualKitty():
             batch[i%batch_size, 0] = self.norm(self.process(image[:,:,0]))
             batch[i%batch_size, 1] = self.norm(self.process(image[:,:,1]))
             batch[i%batch_size, 2] = self.norm(self.process(image[:,:,2]))
-
-            targets[i%batch_size, 0] = self.process(image_seg_channels[:,:,0])
-            targets[i%batch_size, 1] = self.process(image_seg_channels[:,:,1])
-            targets[i%batch_size, 2] = self.process(image_seg_channels[:,:,2])
-            targets[i%batch_size, 3] = self.process(image_seg_channels[:,:,3])
-            targets[i%batch_size, 4] = self.process(image_seg_channels[:,:,4])
-            targets[i%batch_size, 5] = self.process(image_seg_channels[:,:,5])
-            targets[i%batch_size, 6] = self.process(image_seg_channels[:,:,6])
-            targets[i%batch_size, 7] = self.process(image_seg_channels[:,:,7])
-            targets[i%batch_size, 8] = self.process(image_seg_channels[:,:,8])
-            targets[i%batch_size, 9] = self.process(image_seg_channels[:,:,9])
-            targets[i%batch_size, 10] = self.process(image_seg_channels[:,:,10])
-            targets[i%batch_size, 11] = self.process(image_seg_channels[:,:,11])
-            targets[i%batch_size, 12] = self.process(image_seg_channels[:,:,12])
-            targets[i%batch_size, 13] = self.process(image_seg_channels[:,:,13])
-            targets[i%batch_size, 14] = self.process(image_seg_channels[:,:,14])
-            targets[i%batch_size, 15] = self.norm(image_depth[:,:])
+            if self.seg_image:
+                targets[i%batch_size, 0] = self.process(image_seg_channels[:,:,0])
+                targets[i%batch_size, 1] = self.process(image_seg_channels[:,:,1])
+                targets[i%batch_size, 2] = self.process(image_seg_channels[:,:,2])
+                targets[i%batch_size, 3] = self.process(image_seg_channels[:,:,3])
+                targets[i%batch_size, 4] = self.process(image_seg_channels[:,:,4])
+                targets[i%batch_size, 5] = self.process(image_seg_channels[:,:,5])
+                targets[i%batch_size, 6] = self.process(image_seg_channels[:,:,6])
+                targets[i%batch_size, 7] = self.process(image_seg_channels[:,:,7])
+                targets[i%batch_size, 8] = self.process(image_seg_channels[:,:,8])
+                targets[i%batch_size, 9] = self.process(image_seg_channels[:,:,9])
+                targets[i%batch_size, 10] = self.process(image_seg_channels[:,:,10])
+                targets[i%batch_size, 11] = self.process(image_seg_channels[:,:,11])
+                targets[i%batch_size, 12] = self.process(image_seg_channels[:,:,12])
+                targets[i%batch_size, 13] = self.process(image_seg_channels[:,:,13])
+                targets[i%batch_size, 14] = self.process(image_seg_channels[:,:,14])
+            if self.depth_image:
+                targets[i%batch_size, -1] = self.norm(image_depth[:,:])
 
             # print("Targets", np.min(targets[i%batch_size,15]), "max", np.max(targets[i%batch_size,15]), np.average(targets[i%batch_size, 15]))
             ####### Plot images input to debug errors
