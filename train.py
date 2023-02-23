@@ -97,11 +97,11 @@ if __name__ == "__main__":
     for name, parameter in model.named_parameters():
         print("Parameter", name, parameter.numel())
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print("Numero de parametros toales", pytorch_total_params)
+    print("Numero de parametros totales", pytorch_total_params)
     # Hyperparameters
     # epochs = 100
-    learning_rate = 1.0e-3
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-1)
+    learning_rate = 1.0e-4
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
     # Setting up a global loss function
     criterion = FocalTverskyLoss
@@ -129,6 +129,8 @@ if __name__ == "__main__":
         epoch_iou_scores = [] # Computed only on test set
         epoch_dice_scores = [] # Computed only on test set
         epoch_iou_train_scores = []
+        losses_seg_train_epoch = []
+        losses_depth_train_epoch = []
         i = 0
         for batch, targets in virtual_kitty.load_train(max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
             # ####### Plot images input to debug errors
@@ -186,6 +188,7 @@ if __name__ == "__main__":
                     # os.makedirs("./runs/train/run" + str(len_runs_training+1) + "/epoca" + str(epoch), exist_ok=True)
                     # print("Ruta imagen", )
                     # cv.imwrite("./runs/train/run" + str(len_runs_training+1) + "/epoca" + str(epoch) + os.path.sep + "SAMPLE_" + str(i) + "_BATCH_SAMPLE_" + str(j) + ".jpg", image_BGR)
+            
             loss_seg = 0
             loss_depth = 0
             if seg_image:
@@ -193,12 +196,18 @@ if __name__ == "__main__":
             if depth_image:
                 loss_depth = mse_loss(outputs[:,-1],targets[:,-1])
             loss = loss_seg + loss_depth
+                
             # TODO MSE depth sumar perdidas, 
             # TODO separa funcion activacion para seg y depth seg --> sftmax, depth --> sigmoid
             # TODO hacer solo profundidad
             epoch_train_losses.append(float(loss))
             loss.backward()
             optimizer.step()
+            with torch.no_grad():
+                if seg_image:
+                    losses_seg_train_epoch.append(loss_seg.cpu())
+                if depth_image:
+                    losses_depth_train_epoch.append(loss_depth.cpu())
             # Clear Cache
             del batch
             del targets
@@ -242,8 +251,8 @@ if __name__ == "__main__":
         if (epoch % args_parsed['print_test']) == 0:
             writer.add_scalar('Loss/test',test_avg_loss, epoch)
             writer.add_scalar('Accuracy/test', iou_avg_score, epoch)
-        writer.add_scalar('Loss/train_seg', loss_seg, epoch)
-        writer.add_scalar('Loss/train_depth', loss_depth, epoch)
+        writer.add_scalar('Loss/train_seg', np.average(losses_seg_train_epoch), epoch)
+        writer.add_scalar('Loss/train_depth', np.average(losses_depth_train_epoch), epoch)
         writer.add_scalar('Accuracy/train', iou_score, epoch)
 
                 

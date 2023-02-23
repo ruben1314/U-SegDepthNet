@@ -100,9 +100,9 @@ if __name__ == "__main__":
                     image_BGR = cv.cvtColor(np.float32(image_rgb), cv.COLOR_RGB2BGR)
                 # print(np.min(np.array(outputs[j,15].cpu())), np.max(np.array(outputs[j,15].cpu())), "shape", outputs[j,15].cpu().shape)
                 if depth_image:
-                    image_depth_norm = virtual_kitty.norm(np.array(outputs[j,-1].cpu()))
+                    # image_depth_norm = virtual_kitty.norm(np.array(outputs[j,-1].cpu()))
                     # print("image_depth min", np.min(image_depth_norm), "max", np.max(image_depth_norm))
-                    image_depth = virtual_kitty.convert_range_image(image_depth_norm)
+                    image_depth = virtual_kitty.convert_range_image(np.array(outputs[j,-1].cpu()))
                 # print("image_depth min", np.min(image_depth), "max", np.max(image_depth))
                 # plt.imshow(image_depth, cmap='gray')
                 # plt.waitforbuttonpress()
