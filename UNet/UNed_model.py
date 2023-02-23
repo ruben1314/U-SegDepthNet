@@ -109,11 +109,14 @@ class FCN(nn.Module):
         
         out = self.fc(uc1)
         if self.out_channels >= 16:
+            # print("ambas funciones de activacion")
             out[:,:15] = self.soft_max(out[:,:15])
             out[:,15] = self.sigmoid(out[:,15])
         elif self.out_channels == 1:
-            out[:,0] = self.sigmoid(out[:,0])
+            # print("Sigmoide")
+            out[:,-1] = self.sigmoid(out[:,-1])
         elif self.out_channels == 15:
+            # print("Softmax")
             out[:,:15] = self.soft_max(out[:,:15])
         
         return out
