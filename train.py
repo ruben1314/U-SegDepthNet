@@ -80,7 +80,7 @@ if __name__ == "__main__":
     args_parsed = dict()
     parse_args()
     in_channels = 3
-    out_channels = 1
+    out_channels = 15
     seg_image = False
     depth_image = False
     if out_channels == 1:
@@ -197,7 +197,6 @@ if __name__ == "__main__":
             loss_depth = 0
             if seg_image:
                 loss_seg = criterion(outputs[:,:15], targets[:,:15]) 
-            print("Outputs", outputs.shape,"targets", targets.shape)
             if depth_image:
                 loss_depth = mse_loss(outputs[:,-1],targets[:,-1])
             loss = loss_seg + loss_depth
@@ -258,7 +257,8 @@ if __name__ == "__main__":
             writer.add_scalar('Accuracy/test', iou_avg_score, epoch)
         writer.add_scalar('Loss/train_seg', np.average(losses_seg_train_epoch), epoch)
         writer.add_scalar('Loss/train_depth', np.average(losses_depth_train_epoch), epoch)
-        writer.add_scalar('Accuracy/train', iou_score, epoch)
+        if seg_image:
+            writer.add_scalar('Accuracy/train', iou_score, epoch)
 
                 
         EPOCH_END_TIME = time.time()
