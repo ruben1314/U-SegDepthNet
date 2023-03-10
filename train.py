@@ -80,7 +80,7 @@ if __name__ == "__main__":
     args_parsed = dict()
     parse_args()
     in_channels = 3
-    out_channels = 15
+    out_channels = 16
     seg_image = False
     depth_image = False
     if out_channels == 1:
@@ -126,11 +126,13 @@ if __name__ == "__main__":
         
         epoch_train_losses = []
         epoch_test_losses = []
-        epoch_iou_scores = [] # Computed only on test set
+        epoch_test_iou_scores = [] # Computed only on test set
         epoch_dice_scores = [] # Computed only on test set
         epoch_iou_train_scores = []
         losses_seg_train_epoch = []
         losses_depth_train_epoch = []
+        losses_seg_test_epoch = []
+        losses_depth_test_epoch = []
         i = 0
         for batch, targets in virtual_kitty.load_train(max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
             # ####### Plot images input to debug errors
@@ -166,8 +168,8 @@ if __name__ == "__main__":
             outputs = model(batch)
             with torch.no_grad():
                     if seg_image:
-                        predictions = outputs.cpu() > 0.75
-                        iou_score = float(IOU(predictions, targets_one_hot))
+                        predictions = outputs[:,:15].cpu() > 0.75
+                        iou_score = float(IOU(predictions[:,:15], targets_one_hot))
                         # accuracy(predictions[:,:15], targets[:,:15].cpu(),args_parsed['batch_size'])
                         epoch_iou_train_scores.append(iou_score)
                         # epoch_dice_scores.append(dice_score)
@@ -224,62 +226,76 @@ if __name__ == "__main__":
                 # Convert samples to one-hot form
                 batch = torch.tensor(batch)
                 targets = torch.tensor(targets)
-                targets_one_hot = targets > 0
+                if seg_image:
+                    targets_one_hot = targets[:,:15] > 0
                 # Copy to GPU
                 batch = batch.float().cuda(device=args_parsed["device"])
-                targets = targets_one_hot.float().cuda(device=args_parsed["device"])
+                if seg_image:
+                    targets[:,:15] = targets_one_hot.float()
+                targets = targets.cuda(device=args_parsed["device"])
                 # Forward Propagation
                 with torch.no_grad():
                     outputs = model(batch)
-                    loss = float(criterion(outputs, targets))
-                    predictions = outputs.cpu() > 0.75
-                    iou_score = float(IOU(predictions, targets_one_hot))
-                    # dice_score = float(DiceScore(predictions, targets_one_hot))
-                    epoch_iou_scores.append(iou_score)
+                    if seg_image:
+                        predictions = outputs[:,:15].cpu() > 0.75
+                        iou_score_test = float(IOU(predictions[:,:15], targets_one_hot))
+                        epoch_test_iou_scores.append(iou_score_test)
                     # epoch_dice_scores.append(dice_score)
-                    epoch_test_losses.append(loss)
+                    # epoch_test_losses.append(loss)
                 # Clear Cache
+                torch.cuda.empty_cache()
+                loss_seg_test = 0
+                loss_depth_test = 0
+                if seg_image:
+                    loss_seg_test = criterion(outputs[:,:15], targets[:,:15]) 
+                if depth_image:
+                    loss_depth_test = mse_loss(outputs[:,-1],targets[:,-1])
+                loss_test = loss_seg_test + loss_depth_test
+                with torch.no_grad():
+                    if seg_image:
+                        losses_seg_test_epoch.append(loss_seg_test.cpu())
+                    if depth_image:
+                        losses_depth_test_epoch.append(loss_depth_test.cpu())
+                epoch_test_losses.append(float(loss_test))
                 del batch
                 del targets
                 del outputs
-                torch.cuda.empty_cache()
             test_avg_loss = np.average(epoch_test_losses)
-            iou_avg_score = np.average(epoch_iou_scores)
-            # dice_avg_score = np.average(epoch_dice_scores)
+            iou_test_avg_score = np.average(epoch_test_iou_scores)
 
-            test_avg_losses.append(test_avg_loss)
-            avg_iou_scores.append(iou_avg_score)
-            # avg_dice_scores.append(dice_avg_score)
-
-        # for n_iter in range(100):
+        train_avg_loss = np.average(epoch_train_losses)
         if (epoch % args_parsed['print_test']) == 0:
             writer.add_scalar('Loss/test',test_avg_loss, epoch)
-            writer.add_scalar('Accuracy/test', iou_avg_score, epoch)
-        writer.add_scalar('Loss/train_seg', np.average(losses_seg_train_epoch), epoch)
-        writer.add_scalar('Loss/train_depth', np.average(losses_depth_train_epoch), epoch)
+            if seg_image:
+                writer.add_scalar('Loss/test_seg', np.average(losses_seg_test_epoch), epoch)
+                writer.add_scalar('Accuracy/test_seg', iou_test_avg_score, epoch)
+            if depth_image:
+                writer.add_scalar('Loss/test_depth', np.average(losses_depth_test_epoch), epoch)
+        if depth_image:
+            writer.add_scalar('Loss/train_depth', np.average(losses_depth_train_epoch), epoch)
         if seg_image:
-            writer.add_scalar('Accuracy/train', iou_score, epoch)
+            writer.add_scalar('Loss/train_seg', np.average(losses_seg_train_epoch), epoch)
+            writer.add_scalar('Accuracy/train_seg', np.average(epoch_iou_train_scores), epoch)
+        writer.add_scalar('Loss/train', np.average(train_avg_loss), epoch)
 
-                
         EPOCH_END_TIME = time.time()
         
-        train_avg_loss = np.average(epoch_train_losses)
         
-        train_avg_losses.append(train_avg_loss)
-        
+                
         training_time_stamp = int(EPOCH_END_TIME - TRAINING_START_TIME)
         epoch_time_taken = int(EPOCH_END_TIME - EPOCH_START_TIME)
         ep = f"{epoch+1}".zfill(2)
-        print(f"[{ep}/{args_parsed['epochs']}]  TOOK:{epoch_time_taken}s (TOTAL:{training_time_stamp}s TRAIN:{train_avg_loss:.5f}",end="")
+        print(f"[{ep}/{args_parsed['epochs']}]  TOOK:{epoch_time_taken}s (TOTAL:{training_time_stamp}s TRAIN:{train_avg_loss:.5f} AVG_IOU_SEG_TRAIN:{np.average(epoch_iou_train_scores):5f}"\
+              f" AVG_LOSS_SEG_TRAIN:{np.average(losses_seg_train_epoch)} AVG_LOSS_DEPTH_TRAIN:{np.average(losses_depth_train_epoch):5f}",end="")
         if (epoch % args_parsed['print_test'] == 0):
-            print(f" TEST:{test_avg_loss:.5f}  AVG_IOU_SCORE:{iou_avg_score:.5f}", end="")
+            print(f" TEST:{test_avg_loss:.5f}  AVG_IOU_SEG_SCORE_TEST :{iou_test_avg_score:.5f}", end="")
         print(")")
         
         # Save the model every 10 epochs
         if ((epoch+1) % 10) == 0:
             torch.save(model.state_dict(), args_parsed["output"] + os.path.sep + f"basicUNET_epoch{(epoch+1)}.torch")
 
-    for epoch_model in os.listdir(args_parsed["output"]):
-        if re.search ("epoch", epoch_model):
-            os.remove(args_parsed["output"] + epoch_model)
+    # for epoch_model in os.listdir(args_parsed["output"]):
+    #     if re.search ("epoch", epoch_model):
+    #         os.remove(args_parsed["output"] + epoch_model)
     torch.save(model.state_dict(),args_parsed["output"] + os.path.sep + "UNet.torch")
