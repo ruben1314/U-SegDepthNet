@@ -119,7 +119,7 @@ def calculate_IOU(imagen_seg_mmseg, seg_image_UNET, image_GT_seg):
     seg_image_UNET_tensor = torch.tensor(seg_image_UNET)
     image_GT_seg_tensor = torch.tensor(image_GT_seg)
     iou_UNET = IOU(seg_image_UNET_tensor, image_GT_seg_tensor)
-    
+
     return 0, iou_UNET
 
 if __name__ == "__main__":
@@ -150,6 +150,7 @@ if __name__ == "__main__":
         os.chdir('../mmsegmentation')
         imagen_seg = next(gen_seg)
         imagen_seg = cv2.resize(imagen_seg, (624,192), interpolation=cv2.INTER_NEAREST)
+        imagen_seg = cv2.cvtColor(imagen_seg, cv2.COLOR_BGR2RGB)
         print("imagen")
         # plt.imshow(imagen_depth, cmap='gray_r', vmax=vmax)
         # plt.waitforbuttonpress()
