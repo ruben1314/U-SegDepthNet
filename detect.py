@@ -22,12 +22,37 @@ def parse_args():
     args_parsed['batch_size'] = args.batch_size
     print("Args parsed ", args_parsed)
 
+def inference_image(model_path):
+    model = FCN(3, 16)
+    model.load_state_dict(torch.load(model_path))
+    model.cuda(device=0)
+    virtual_kitty = VirtualKitty('./datasets/test.txt', 1)
+    for batch in virtual_kitty.load_test():
+        batch = torch.tensor(batch)
+        # Copy to GPU
+        batch = batch.float().cuda()        
+        with torch.no_grad():
+            outputs = model(batch)
+        for j in range(1):
+                # Plot these results
+                # fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
+                image = np.zeros((192, 624,15), dtype=np.int8)
+                image_depth = np.zeros((192,624), dtype=np.float32)
+                for channel in range(15):
+                    predictions = outputs[j,channel].cpu()
+                    mapped_predictions = predictions > 0.75
+                    image[:,:,channel] = mapped_predictions
+                # image_rgb = virtual_kitty.convert_channels_toRGB(image)
+                image_depth = np.array(outputs[j,-1].cpu())
+        yield image_depth, image
+
+
 if __name__ == "__main__":
     global args_parsed
     args_parsed = dict()
     parse_args()
     in_channels = 3
-    out_channels = 1
+    out_channels = 16
     seg_image = False
     depth_image = False
     if out_channels == 1:
