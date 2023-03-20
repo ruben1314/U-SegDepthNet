@@ -179,6 +179,7 @@ class VirtualKitty():
         print("Loading dataset in: ", self.data_dir)
         if os.path.isdir(base_dir):
             samples = os.listdir(base_dir)
+            samples = sorted(samples)
         else:
             with open(base_dir , 'r') as f:
                 samples = f.readlines()
@@ -189,6 +190,8 @@ class VirtualKitty():
         i = 0
         for sample in samples:
             # sample_dir = base_dir + os.path.sep + sample
+            if os.path.isdir(base_dir):
+                sample = base_dir + '/' + sample
             sample_dir = sample.replace('\n','')
             print("Imagen", sample_dir)
             image = cv.imread(sample_dir)

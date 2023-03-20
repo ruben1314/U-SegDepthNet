@@ -22,11 +22,11 @@ def parse_args():
     args_parsed['batch_size'] = args.batch_size
     print("Args parsed ", args_parsed)
 
-def inference_image(model_path):
+def inference_image(model_path, data_path):
     model = FCN(3, 16)
     model.load_state_dict(torch.load(model_path))
     model.cuda(device=0)
-    virtual_kitty = VirtualKitty('./datasets/test.txt', 1)
+    virtual_kitty = VirtualKitty(data_path, 1)
     for batch in virtual_kitty.load_test():
         batch = torch.tensor(batch)
         # Copy to GPU

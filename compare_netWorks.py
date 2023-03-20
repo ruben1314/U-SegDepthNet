@@ -138,7 +138,7 @@ if __name__ == "__main__":
     # os.chdir('../mmsegmentation/')
     gen_seg = get_imagen_segmentator(lines)
     # os.chdir('..')
-    gen_UNET = inference_image('./models_ssh/mix_full/basicUNET_epoch10.torch')
+    gen_UNET = inference_image('./models_ssh/mix_full/basicUNET_epoch52.torch', './datasets/test.txt')
     for image_number in range(len(lines)):
         image_GT_depth = read_depth_gt(lines[image_number])
         image_GT_seg = read_seg_GT(lines[image_number])
