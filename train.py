@@ -9,9 +9,11 @@ import time
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
-from datasets.dataset import VirtualKitty
+from datasets.dataset import VirtualKitty, CityScapes
 import cv2 as cv
 from torch.utils.tensorboard import SummaryWriter
+
+datasets = {'VirtualKitty':VirtualKitty, 'CityScapes':CityScapes}
 
 
 def IOU(preds, targets, smooth=0.001):
@@ -64,6 +66,7 @@ def parse_args():
     parser.add_argument('-print_test', '--print_test', type=int, default=5, required=False, help='Epochs to calculate average test loss')
     parser.add_argument('-print_images_load', '--print_images_load', type=int, default=100, required=False, help='Images load to print percent')
     parser.add_argument('-epochs', '--epochs', type=int, default=100, required=False, help='Epochs to train. Default:100')
+    parser.add_argument('-dataset', '--dataset', type=str, default="VirtualKitty", required=False, help='dataset to load')
     args = parser.parse_args()
     args_parsed['output'] = args.output
     args_parsed['device'] = args.device
@@ -73,6 +76,7 @@ def parse_args():
     args_parsed['print_test'] = args.print_test
     args_parsed['print_images_load'] = args.print_images_load
     args_parsed['epochs'] = args.epochs
+    args_parsed['dataset'] = args.dataset
     print("Args parsed ", args_parsed)
 
 if __name__ == "__main__":
@@ -118,7 +122,7 @@ if __name__ == "__main__":
         print("No runs")
     os.makedirs("./runs/train/run" + str(len_runs_training+1))
     TRAINING_START_TIME = time.time()
-    virtual_kitty = VirtualKitty(batch_size=args_parsed["batch_size"], seg_image=seg_image, depth_image=depth_image, output_classes=out_channels)
+    dataset_loaded = datasets[args_parsed['dataset']](batch_size=args_parsed["batch_size"], seg_image=seg_image, depth_image=depth_image, output_classes=out_channels)
     writer = SummaryWriter()
     for epoch in range(args_parsed['epochs']):
         print("############################### EPOCH ", epoch, " ###############################")
@@ -134,7 +138,7 @@ if __name__ == "__main__":
         losses_seg_test_epoch = []
         losses_depth_test_epoch = []
         i = 0
-        for batch, targets in virtual_kitty.load_train(max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
+        for batch, targets in dataset_loaded.load_train(max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
             # ####### Plot images input to debug errors
             # print("Haceindo cosas de batches", len(batch))
             # for image_batch_index in range(len(batch)):
@@ -184,7 +188,7 @@ if __name__ == "__main__":
             #             image[:,:,channel] = mapped_predictions
                         # plt.imshow(image[:,:,channel])
                         # plt.waitforbuttonpress()
-                    # image_rgb = virtual_kitty.convert_channels_toRGB(image)
+                    # image_rgb = dataset_loaded.convert_channels_toRGB(image)
                     # print("Image rgb channels", image_rgb.shape)
                     # OpenCV needs BGR
                     # image_BGR = cv.cvtColor(np.float32(image_rgb), cv.COLOR_RGB2BGR)
@@ -222,7 +226,7 @@ if __name__ == "__main__":
             i += 1
 
         if (epoch % args_parsed['print_test']) == 0:
-            for batch, targets in virtual_kitty.load_train(train=False,max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
+            for batch, targets in dataset_loaded.load_train(train=False,max_percent=args_parsed['dataset_reduction'],print_images_load=args_parsed['print_images_load']):
                 # Convert samples to one-hot form
                 batch = torch.tensor(batch)
                 targets = torch.tensor(targets)
@@ -292,7 +296,7 @@ if __name__ == "__main__":
         print(")")
         
         # Save the model every 10 epochs
-        if ((epoch+1) % 10) == 0:
+        if ((epoch+1) % 4) == 0:
             torch.save(model.state_dict(), args_parsed["output"] + os.path.sep + f"basicUNET_epoch{(epoch+1)}.torch")
 
     # for epoch_model in os.listdir(args_parsed["output"]):

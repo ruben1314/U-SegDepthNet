@@ -7,3 +7,4 @@ datasets/test.txt
 *.jpg
 *.png
 *.torch
+.hypothesis/unicode_data/12.1.0/charmap.json.gz
