@@ -84,16 +84,18 @@ if __name__ == "__main__":
     args_parsed = dict()
     parse_args()
     in_channels = 3
-    out_channels = 16
+    out_channels = 19
     seg_image = False
     depth_image = False
+    seg_channels = out_channels
     if out_channels == 1:
         depth_image = True
-    elif out_channels == 15:
+    elif out_channels == 19:
         seg_image = True
-    elif out_channels == 16:
+    elif out_channels == 19+1:
         seg_image = True
         depth_image = True
+        seg_channels -= 1
     model = FCN(in_channels, out_channels)
     if args_parsed['model'] != "":
         model.load_state_dict(torch.load(args_parsed['model']))
@@ -147,7 +149,7 @@ if __name__ == "__main__":
             #     image = np.moveaxis(batch[image_batch_index], 0, 2)
 
             #     plt.imshow(image)
-            #     for channel_index in range(15):
+            #     for channel_index in range(seg_channels):
             #         # print("channel", channel.shape)
             #         plt.subplot(6,3,channel_index+2)
             #         image_seg = np.moveaxis(targets[image_batch_index], 0, 2)
@@ -161,28 +163,28 @@ if __name__ == "__main__":
             batch = torch.tensor(batch)
             targets = torch.tensor(targets)
             if seg_image:
-                targets_one_hot = targets[:,:15] > 0
+                targets_one_hot = targets[:,:seg_channels] > 0
             # Copy to GPU
             batch = batch.float().cuda(device=args_parsed["device"])
             if seg_image:
-                targets[:,:15] = targets_one_hot.float()
+                targets[:,:seg_channels] = targets_one_hot.float()
             targets = targets.cuda(device=args_parsed["device"])
             # Train
             optimizer.zero_grad()
             outputs = model(batch)
             with torch.no_grad():
                     if seg_image:
-                        predictions = outputs[:,:15].cpu() > 0.75
-                        iou_score = float(IOU(predictions[:,:15], targets_one_hot))
-                        # accuracy(predictions[:,:15], targets[:,:15].cpu(),args_parsed['batch_size'])
+                        predictions = outputs[:,:seg_channels].cpu() > 0.75
+                        iou_score = float(IOU(predictions[:,:seg_channels], targets_one_hot))
+                        # accuracy(predictions[:,:seg_channels], targets[:,:seg_channels].cpu(),args_parsed['batch_size'])
                         epoch_iou_train_scores.append(iou_score)
                         # epoch_dice_scores.append(dice_score)
             # if True:
             #     for j in range(args_parsed['batch_size']):
             #         # Plot these results
             #         # fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
-            #         image = np.zeros((192, 624,15), dtype=np.int8)
-            #         for channel in range(15):
+            #         image = np.zeros((192, 624,seg_channels), dtype=np.int8)
+            #         for channel in range(seg_channels):
             #             predictions = outputs[j,channel].cpu()
             #             mapped_predictions = predictions > 0.75
             #             image[:,:,channel] = mapped_predictions
@@ -202,7 +204,7 @@ if __name__ == "__main__":
             loss_seg = 0
             loss_depth = 0
             if seg_image:
-                loss_seg = criterion(outputs[:,:15], targets[:,:15]) 
+                loss_seg = criterion(outputs[:,:seg_channels], targets[:,:seg_channels]) 
             if depth_image:
                 loss_depth = mse_loss(outputs[:,-1],targets[:,-1])
             loss = loss_seg + loss_depth
@@ -231,18 +233,18 @@ if __name__ == "__main__":
                 batch = torch.tensor(batch)
                 targets = torch.tensor(targets)
                 if seg_image:
-                    targets_one_hot = targets[:,:15] > 0
+                    targets_one_hot = targets[:,:seg_channels] > 0
                 # Copy to GPU
                 batch = batch.float().cuda(device=args_parsed["device"])
                 if seg_image:
-                    targets[:,:15] = targets_one_hot.float()
+                    targets[:,:seg_channels] = targets_one_hot.float()
                 targets = targets.cuda(device=args_parsed["device"])
                 # Forward Propagation
                 with torch.no_grad():
                     outputs = model(batch)
                     if seg_image:
-                        predictions = outputs[:,:15].cpu() > 0.75
-                        iou_score_test = float(IOU(predictions[:,:15], targets_one_hot))
+                        predictions = outputs[:,:seg_channels].cpu() > 0.75
+                        iou_score_test = float(IOU(predictions[:,:seg_channels], targets_one_hot))
                         epoch_test_iou_scores.append(iou_score_test)
                     # epoch_dice_scores.append(dice_score)
                     # epoch_test_losses.append(loss)
@@ -251,7 +253,7 @@ if __name__ == "__main__":
                 loss_seg_test = 0
                 loss_depth_test = 0
                 if seg_image:
-                    loss_seg_test = criterion(outputs[:,:15], targets[:,:15]) 
+                    loss_seg_test = criterion(outputs[:,:seg_channels], targets[:,:seg_channels]) 
                 if depth_image:
                     loss_depth_test = mse_loss(outputs[:,-1],targets[:,-1])
                 loss_test = loss_seg_test + loss_depth_test

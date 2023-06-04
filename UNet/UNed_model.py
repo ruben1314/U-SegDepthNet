@@ -108,15 +108,15 @@ class FCN(nn.Module):
         # Final Convolution Layer
         
         out = self.fc(uc1)
-        if self.out_channels >= 16:
+        if self.out_channels >= 20:
             # print("ambas funciones de activacion")
             out[:,:15] = self.soft_max(out[:,:15])
             out[:,15] = self.sigmoid(out[:,15])
         elif self.out_channels == 1:
             # print("Sigmoide")
             out[:,-1] = self.sigmoid(out[:,-1])
-        elif self.out_channels == 15:
+        elif self.out_channels == 19:
             # print("Softmax")
-            out[:,:15] = self.soft_max(out[:,:15])
+            out[:,:19] = self.soft_max(out[:,:19])
         
         return out
