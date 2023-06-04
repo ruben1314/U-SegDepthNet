@@ -5,7 +5,10 @@ from UNet.UNed_model import FCN
 import os
 import numpy as np
 import cv2 as cv
-from datasets.dataset import VirtualKitty
+from datasets.dataset import VirtualKitty, CityScapes
+
+
+datasets = {'VirtualKitty':VirtualKitty, 'CityScapes':CityScapes}
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -14,12 +17,14 @@ def parse_args():
     parser.add_argument('-device', '--device', type=int, default=0, required=True, help='Device GPU to execute')
     parser.add_argument('-model', '--model', type=str, default="", required=True, help='Path to model')
     parser.add_argument('-batch_size', '--batch_size', type=int, default=1, required=True, help='Batch size to train')
+    parser.add_argument('-dataset', '--dataset', type=str, default="VirtualKitty", required=False, help='dataset to load')
     args = parser.parse_args()
     args_parsed['source'] = args.source
     # args_parsed['output'] = args.output
     args_parsed['device'] = args.device
     args_parsed['model'] = args.model
     args_parsed['batch_size'] = args.batch_size
+    args_parsed['dataset'] = args.dataset
     print("Args parsed ", args_parsed)
 
 def inference_image(model_path, data_path):
@@ -36,9 +41,9 @@ def inference_image(model_path, data_path):
         for j in range(1):
                 # Plot these results
                 # fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
-                image = np.zeros((192, 624,15), dtype=np.int8)
+                image = np.zeros((192, 624,seg_channels), dtype=np.int8)
                 image_depth = np.zeros((192,624), dtype=np.float32)
-                for channel in range(15):
+                for channel in range(seg_channels):
                     predictions = outputs[j,channel].cpu()
                     mapped_predictions = predictions > 0.75
                     image[:,:,channel] = mapped_predictions
@@ -52,16 +57,18 @@ if __name__ == "__main__":
     args_parsed = dict()
     parse_args()
     in_channels = 3
-    out_channels = 16
+    out_channels = 19
     seg_image = False
     depth_image = False
+    seg_channels = out_channels
     if out_channels == 1:
         depth_image = True
-    elif out_channels == 15:
+    elif out_channels == 19:
         seg_image = True
-    elif out_channels == 16:
+    elif out_channels == 19+1:
         seg_image = True
         depth_image = True
+        seg_channels -= 1
     model = FCN(in_channels, out_channels)
     model.load_state_dict(torch.load(args_parsed['model']))
     # model.eval()
@@ -76,8 +83,8 @@ if __name__ == "__main__":
     args_parsed['output'] = "./runs/detect/run"+str(detect_runs+1) + os.path.sep
     n = (40 // args_parsed['batch_size']) # Plot about 40 samples
     cm = "gray" # Color Map
-    virtual_kitty = VirtualKitty(args_parsed['source'], args_parsed['batch_size'])
-    batch_it = virtual_kitty.load_test()
+    dataset_loaded = datasets[args_parsed['dataset']](args_parsed['source'], args_parsed['batch_size'])
+    batch_it = dataset_loaded.load_test()
     # for i in range(n):
         # print("batch nexxt ", next(batch_it).shape)
     i = 0
@@ -110,24 +117,24 @@ if __name__ == "__main__":
             for j in range(args_parsed['batch_size']):
                 # Plot these results
                 # fig, ax = plt.subplots(nrows=3, ncols=5, figsize=(32, 32))
-                image = np.zeros((192, 624,15), dtype=np.int8)
+                image = np.zeros((192, 624,seg_channels), dtype=np.int8)
                 image_depth = np.zeros((192,624), dtype=np.float32)
                 if seg_image:
-                    for channel in range(15):
+                    for channel in range(seg_channels):
                         predictions = outputs[j,channel].cpu()
                         mapped_predictions = predictions > 0.75
                         image[:,:,channel] = mapped_predictions
                         # plt.imshow(image[:,:,channel])
                         # plt.waitforbuttonpress()
-                    image_rgb = virtual_kitty.convert_channels_toRGB(image)
+                    image_rgb = dataset_loaded.convert_channels_toRGB(image)
                     # print("Image rgb channels", image_rgb.shape)
                     # OpenCV needs BGR
                     image_BGR = cv.cvtColor(np.float32(image_rgb), cv.COLOR_RGB2BGR)
-                # print(np.min(np.array(outputs[j,15].cpu())), np.max(np.array(outputs[j,15].cpu())), "shape", outputs[j,15].cpu().shape)
+                # print(np.min(np.array(outputs[j,seg_channels].cpu())), np.max(np.array(outputs[j,seg_channels].cpu())), "shape", outputs[j,seg_channels].cpu().shape)
                 if depth_image:
                     # image_depth_norm = virtual_kitty.norm(np.array(outputs[j,-1].cpu()))
                     # print("image_depth min", np.min(image_depth_norm), "max", np.max(image_depth_norm))
-                    image_depth = virtual_kitty.convert_range_image(np.array(outputs[j,-1].cpu()))
+                    image_depth = dataset_loaded.convert_range_image(np.array(outputs[j,-1].cpu()))
                 # print("image_depth min", np.min(image_depth), "max", np.max(image_depth))
                 # plt.imshow(image_depth, cmap='gray')
                 # plt.waitforbuttonpress()

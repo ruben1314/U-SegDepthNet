@@ -450,3 +450,39 @@ class CityScapes():
     def norm(self, image):
         ''' Normalize Image '''
         return (image - np.min(image)) / (np.max(image) - np.min(image))
+    
+    def load_test(self):
+        batch_size = self.batch_size
+        # Init
+        batch = np.zeros((batch_size, 3, 192, 624))
+        base_dir = self.data_dir
+        print("Loading dataset in: ", self.data_dir)
+        if os.path.isdir(base_dir):
+            samples = os.listdir(base_dir)
+            samples = sorted(samples)
+        else:
+            with open(base_dir , 'r') as f:
+                samples = f.readlines()
+        # print("samples", samples)
+        # samples = sorted(samples)
+        # if shuffle: random.shuffle(samples)
+        # Yield samples when batch is full
+        i = 0
+        for sample in samples:
+            # sample_dir = base_dir + os.path.sep + sample
+            if os.path.isdir(base_dir):
+                sample = base_dir + '/' + sample
+            sample_dir = sample.replace('\n','')
+            print("Imagen", sample_dir)
+            image = cv.imread(sample_dir)
+            image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
+            image = cv.resize(image, (624,192), interpolation=cv.INTER_NEAREST)
+            # plt.imshow(image)
+            # plt.show()
+            batch[i%batch_size, 0] = self.norm(self.process(image[:,:,0]))
+            batch[i%batch_size, 1] = self.norm(self.process(image[:,:,1]))
+            batch[i%batch_size, 2] = self.norm(self.process(image[:,:,2]))
+            # Yield when batch is full
+            i += 1
+            if i > 0 and (i%batch_size) == 0:
+                yield batch.copy()
