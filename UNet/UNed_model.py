@@ -37,11 +37,12 @@ class ConvTranspose(nn.Module):
 
 class FCN(nn.Module):
     
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, depth_channel=False):
         super(FCN, self).__init__()
         # Init
         self.in_channels = in_channels
         self.out_channels = out_channels
+        self.depth_channel = depth_channel
         # Downsamplers
         self.dp1 = nn.MaxPool2d((2, 2))
         self.dp2 = nn.MaxPool2d((2, 2))
@@ -108,15 +109,15 @@ class FCN(nn.Module):
         # Final Convolution Layer
         
         out = self.fc(uc1)
-        if self.out_channels >= 20:
+        if self.depth_channel:
             # print("ambas funciones de activacion")
-            out[:,:15] = self.soft_max(out[:,:15])
-            out[:,15] = self.sigmoid(out[:,15])
+            out[:,:self.out_channels] = self.soft_max(out[:,:self.out_channels])
+            out[:,self.out_channels] = self.sigmoid(out[:,self.out_channels])
         elif self.out_channels == 1:
             # print("Sigmoide")
             out[:,-1] = self.sigmoid(out[:,-1])
-        elif self.out_channels == 19:
+        elif not self.depth_channel:
             # print("Softmax")
-            out[:,:19] = self.soft_max(out[:,:19])
+            out[:,:self.out_channels] = self.soft_max(out[:,:self.out_channels])
         
         return out

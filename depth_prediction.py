@@ -3,11 +3,11 @@ import numpy as np
 import PIL.Image as pil
 import matplotlib.pyplot as plt
 import matplotlib.image as mtpi
-
+import time
 import torch
 from torchvision import transforms
 import sys
-sys.path.append('./monodepth2')
+sys.path.append('./monodepth2/')
 import networks
 from utils import download_model_if_doesnt_exist
 
@@ -32,10 +32,11 @@ encoder.eval()
 depth_decoder.eval();
 
 def inference(image, image_name, original_height, original_width, images_path):
+    start_time = time.time()
     with torch.no_grad():
         features = encoder(image)
         outputs = depth_decoder(features)
-
+    final_depth_time = time.time() - start_time
     disp = outputs[("disp", 0)]
     ## Plotting
     disp_resized = torch.nn.functional.interpolate(disp,
@@ -59,7 +60,7 @@ def inference(image, image_name, original_height, original_width, images_path):
     mtpi.imsave("./assets/out/"+image_name + ".jpg", disp_resized_np, vmax=vmax, cmap='magma')
     # plt.savefig("./assets/out/"+image_name + ".jpg", cv.COLORMAP_MAGMA)
     # plt.title("Disparity prediction", fontsize=22)
-    return disp_resized_np,vmax
+    return disp_resized_np,vmax, final_depth_time
 
 def predict_images(images_path):
     # print("images path dpeth", images_path)
@@ -75,8 +76,8 @@ def predict_images(images_path):
         input_image_resized = input_image.resize((feed_width, feed_height), pil.LANCZOS)
 
         input_image_pytorch = transforms.ToTensor()(input_image_resized).unsqueeze(0)
-        img_result, vmax = inference(input_image_pytorch, name, original_height, original_width, input_image)
-        yield img_result, vmax
+        img_result, vmax, final_depth_time = inference(input_image_pytorch, name, original_height, original_width, input_image)
+        yield img_result, vmax, final_depth_time
 
 
 

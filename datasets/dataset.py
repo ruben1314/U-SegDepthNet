@@ -44,6 +44,15 @@ class VirtualKitty():
         self.depth_image = depth_image
         self.output_classes = output_classes
 
+    def get_out_channels(self):
+        return self.output_classes
+    
+    def get_seg_channels(self):
+        if self.output_classes == 16:
+            return self.output_classes - 1
+        return self.output_classes
+    
+
     def norm(self, image):
         ''' Normalize Image '''
         return (image - np.min(image)) / (np.max(image) - np.min(image))
@@ -266,7 +275,7 @@ class VirtualKitty():
 
 
 class CityScapes():
-    def __init__(self, data_dir="", batch_size=4, seg_image=False, depth_image=False, output_classes=16, save_npy=False):
+    def __init__(self, data_dir="", batch_size=4, seg_image=False, depth_image=False, output_classes=19, save_npy=False):
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.seg_image = seg_image
@@ -316,6 +325,12 @@ class CityScapes():
                     [119, 11, 32],
     ]
 
+    def get_out_channels(self):
+        return self.output_classes
+    
+    def get_seg_channels(self):
+        return self.output_classes
+    
     def load_train(self, train=True, shuffle=True, max_percent=1, print_images_load=100):
         batch_size = self.batch_size
         # Init
@@ -438,7 +453,7 @@ class CityScapes():
             # chequeo = np.where(image_ori[:,:]==class_seg)
             time_where = time()
             chequeo = np.where(np.all(image_ori==class_seg, axis=-1))
-            print("Tiempo where", time() - time_where)
+            # print("Tiempo where", time() - time_where)
             image_seg[chequeo[0][:], chequeo[1][:]] = pixel_seg.astype(np.int8)
             if len(chequeo[0]) > 0:
                 try:
@@ -479,10 +494,38 @@ class CityScapes():
             image = cv.resize(image, (624,192), interpolation=cv.INTER_NEAREST)
             # plt.imshow(image)
             # plt.show()
-            batch[i%batch_size, 0] = self.norm(self.process(image[:,:,0]))
-            batch[i%batch_size, 1] = self.norm(self.process(image[:,:,1]))
-            batch[i%batch_size, 2] = self.norm(self.process(image[:,:,2]))
+            batch[i%batch_size, 0] = self.norm(image[:,:,0])
+            batch[i%batch_size, 1] = self.norm(image[:,:,1])
+            batch[i%batch_size, 2] = self.norm(image[:,:,2])
             # Yield when batch is full
             i += 1
             if i > 0 and (i%batch_size) == 0:
                 yield batch.copy()
+
+
+    def convert_channels_toRGB(self, image):
+        image_RGB = np.zeros((192, 624, 3), dtype=np.int16)
+        classes = [[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0], #Terrain
+                   [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0], #Sky
+                   [0,0,1,0,0,0,0,0,0,0,0,0,0,0,0], #Tree
+                   [0,0,0,1,0,0,0,0,0,0,0,0,0,0,0], #Vegetation
+                   [0,0,0,0,1,0,0,0,0,0,0,0,0,0,0], #Building
+                   [0,0,0,0,0,1,0,0,0,0,0,0,0,0,0], #Road
+                   [0,0,0,0,0,0,1,0,0,0,0,0,0,0,0], #GuardRail
+                   [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], #TrafficSign
+                   [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0], #TrafficLight
+                   [0,0,0,0,0,0,0,0,0,1,0,0,0,0,0], #Pole
+                   [0,0,0,0,0,0,0,0,0,0,1,0,0,0,0], #Misc
+                   [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0], #Truck
+                   [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0], #Car
+                   [0,0,0,0,0,0,0,0,0,0,0,0,0,1,0], #Van
+                   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]] # Undefined
+        # for index_class, output_class in enumerate(classes, start=0):
+        for index_class in range(0,19):
+            output_class = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+            output_class[index_class] = 1
+            chequeo = np.where(np.all(image==output_class, axis=-1))
+            if len(chequeo[0]) == 0:
+                continue
+            image_RGB[chequeo[0][:], chequeo[1][:]] = self.colors[index_class]
+        return image_RGB
