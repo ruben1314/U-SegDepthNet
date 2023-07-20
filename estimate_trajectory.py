@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import os
-
+from datasets.dataset import VirtualKitty
 
 def convert_channels_toRGB(image):
     image_RGB = np.zeros((192, 624, 3), dtype=np.int16)
@@ -50,6 +50,9 @@ def extract_road(image_seg):
     chequeo = np.where(np.all(image_seg == [100, 60, 100], axis=-1))
     for i, j in zip(chequeo[0], chequeo[1]):
         image_mask[i, j] = 1
+    cv2.imshow("Mask sin erosionar", image_mask*255)
+    kernel_dilate = np.ones((5,5))
+    image_mask = cv2.dilate(image_mask, kernel_dilate)
     kernel = np.ones((11,11),np.uint8)
     # image_mask = cv2.morphologyEx(image_mask, cv2.MORPH_OPEN, kernel)
     image_mask = cv2.erode(image_mask, kernel)
@@ -67,12 +70,13 @@ def extract_trajectory(road_mask, horizon=99):
         road_points = np.where(road_mask[y_point] == 1)
         if len(road_points[0]) >= 1:
             avg = int(np.median(road_points[0]))
-        points.append((y_point, avg))
+            # avg = int(np.mean([min(road_points[0]), max(road_points[0])]))
+            points.append((y_point, avg))
     return points
 
-def refine_points(trajectory_points):
+def refine_points(trajectory_points, crop_lines=20):
     draw_points = []
-    crop_lines = 20
+    # crop_lines = 20
     for point_index in range(0,len(trajectory_points), crop_lines):
         image_crop_points = trajectory_points[point_index:point_index+crop_lines]
         puntos = list(map(lambda x: x[1], image_crop_points))
@@ -163,14 +167,26 @@ if __name__ == "__main__":
     with open("./datasets/test.txt", 'r') as f:
         lines = f.readlines()
         print("Loading dataset in: ", "./datasets/test.txt")
-        horizon = 99
+        
     image_counter = 0
     images_path = '../Dataset/vkitti_2.0.3_rgb/Scene01/15-deg-left/frames/rgb/Camera_0/'
     images_names = os.listdir(images_path)
     images_names = sorted(images_names)
     cross_frames = 0
     get_matrix_bool = True
-    for depth_image_UNET, seg_image_UNET in inference_image('./models_ssh/mix_full/basicUNET_epoch52.torch', '../Dataset/vkitti_2.0.3_rgb/Scene01/15-deg-left/frames/rgb/Camera_0'):
+    virtual_kitty = VirtualKitty("", 1)
+    # for depth_image_UNET, seg_image_UNET, time_exec in inference_image('./models_ssh/mix_full/basicUNET_epoch32_combine.torch', '../Dataset/vkitti_2.0.3_rgb/Scene01/15-deg-left/frames/rgb/Camera_0',VirtualKitty):
+    for depth_image_UNET, seg_image_UNET, time_exec in inference_image('./models_ssh/mix_full/basicUNET_epoch100_combinetest.torch', '../Dataset/vkitti_2.0.3_rgb/Scene01/15-deg-left/frames/rgb/Camera_0',VirtualKitty):
+    # for depth_image_UNET, seg_image_UNET, time_exec in inference_image('./models_ssh/segbasicUNET_epoch44.torch', '../Dataset/vkitti_2.0.3_rgb/Scene01/15-deg-left/frames/rgb/Camera_0',VirtualKitty):
+    # for depth_image_UNET, seg_image_UNET, time_exec in inference_image('./models_ssh/depth_basicUNET_epoch44.torch', '../Dataset/vkitti_2.0.3_rgb/Scene01/15-deg-left/frames/rgb/Camera_0',VirtualKitty):
+        depth_rep = depth_image_UNET*255
+        # depth_rep = (depth_image_UNET - np.min(depth_image_UNET)) / (np.max(depth_image_UNET) - np.min(depth_image_UNET)) * 255
+        c = 255 / np.log(1 + np.max(depth_rep))
+        depth_rep = c * (np.log(depth_rep + 1))
+        # depth_rep = np.array(depth_rep, dtype=np.uint8)
+        cv2.imshow("Depth", depth_rep)
+        cv2.waitKey()
+        continue
         image_seg_rgb = convert_channels_toRGB(seg_image_UNET)
         image_rgb = cv2.imread(images_path + images_names[image_counter])
         image_rgb = cv2.resize(image_rgb, (624, 192),
@@ -179,14 +195,19 @@ if __name__ == "__main__":
             get_matrix_bool = False
             M, points = get_transform_matrix(image_seg_rgb)
         image_rgb_points = image_rgb.copy()
+        
         for point in points:
-            print("Point", point)
+            # print("Point", point)
             cv2.circle(image_rgb_points, (int(point[0]),int(point[1])),2,(0,0,255), 5)
         
         cv2.imshow("RGB", image_rgb)
-        cv2.imshow("Depth", depth_image_UNET)
+        cv2.imshow("Depth", depth_image_UNET*255)
         road_mask = extract_road(image_seg_rgb)
         road_mask = np.resize(road_mask, (192, 624))
+        road_mask_points = road_mask.copy()
+        for point in points:
+            # print("Point", point)
+            cv2.circle(road_mask_points, (int(point[0]),int(point[1])),2,(0,0,255), 5)
         birdeye_image, birdeye_rgb, warped_img_seg_rgb = get_birdeye_image(image_rgb, image_seg_rgb, depth_image_UNET)
         cross_bool = get_cross(birdeye_image)
         print("Cruce ", cross_bool)
@@ -207,15 +228,25 @@ if __name__ == "__main__":
         cv2.imshow("Birdeye rgb", birdeye_rgb*255)
         cv2.imshow("RGB points", image_rgb_points)
         cv2.imshow("RGB SEG", warped_img_seg_rgb*255)
-        # cv2.waitKey(1)
+        cv2.imshow("Mask points", road_mask_points*255)
+        # image_BGR = cv2.cvtColor(np.float32(image_seg_rgb), cv2.COLOR_RGB2BGR)
+        image_seg_rgb = image_seg_rgb.astype(np.uint8 )
+        cv2.imshow("Segmentation", image_seg_rgb)
+        # cv2.waitKey()
         # plt.imshow(image_seg_rgb)
         # plt.waitforbuttonpress()
         
         # plt.imshow(road_mask)
         # plt.waitforbuttonpress()
         # road_mask = cv2.cvtColor(road_mask, cv2.COLOR_RGB2GRAY)
+        horizon = 110
+        crop_lines = 20
+        if cross_bool:
+            horizon = 140
+            crop_lines = 5
+        
         trajectory_points = extract_trajectory(road_mask, horizon=horizon)
-        trajectory_points = refine_points(trajectory_points)
+        trajectory_points = refine_points(trajectory_points,crop_lines)
         for point1, point2 in zip(trajectory_points[:], trajectory_points[1:]):
             # cv2.circle(image_rgb, (line_points[1], line_points[0]), radius=1,
             #            color=(255, 0, 0), thickness=5)

@@ -30,13 +30,13 @@ def parse_args():
 
 def inference_image(model_path, data_path, dataset:VirtualKitty or CityScapes):
     
-    dataset_loaded = dataset(data_path, 1)
+    dataset_loaded = dataset(data_path, 1, output_classes=16)
     out_channels = dataset_loaded.get_out_channels()
     seg_channels = dataset_loaded.get_seg_channels()
     # print("Out channels", out_channels, "Seg channels", seg_channels )
     model = FCN(3, out_channels)
     # print("Model path", model_path, dataset)
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path,map_location='cuda:0'))
     model.cuda(device=0)
     for batch in dataset_loaded.load_test():
         start_time = time.time()
@@ -65,15 +65,15 @@ if __name__ == "__main__":
     args_parsed = dict()
     parse_args()
     in_channels = 3
-    out_channels = 19
+    out_channels = 16
     seg_image = False
     depth_image = False
     seg_channels = out_channels
     if out_channels == 1:
         depth_image = True
-    elif out_channels == 19:
+    elif out_channels == 16:
         seg_image = True
-    elif out_channels == 19+1:
+    elif out_channels == 15+1:
         seg_image = True
         depth_image = True
         seg_channels -= 1
