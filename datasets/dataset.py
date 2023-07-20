@@ -7,7 +7,7 @@ from time import time
 
 class VirtualKitty():
     
-    def __init__(self, data_dir="", batch_size=4, seg_image=False, depth_image=False, output_classes=16):
+    def __init__(self, data_dir="", batch_size=4, seg_image=False, depth_image=False, output_classes=16, save_npy=False):
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.classes = [[210,0,200], #Terrain
@@ -43,6 +43,7 @@ class VirtualKitty():
         self.seg_image = seg_image
         self.depth_image = depth_image
         self.output_classes = output_classes
+        self.save_npy = save_npy
 
     def get_out_channels(self):
         return self.output_classes
@@ -96,7 +97,7 @@ class VirtualKitty():
                 image_seg_path = image_seg_path.replace(basename,"")
                 file_name, ext = os.path.splitext(basename)
                 file_name_splitted = file_name.split("_")
-                basename = "classgt_" + file_name_splitted[-1] + ".png"
+                basename = "classgt_" + file_name_splitted[-1] + ".npy"
                 image_seg_path = os.path.join(image_seg_path,basename)
                 image_seg_path = image_seg_path.replace("_rgb/","_classSegmentation/")
             sample = sample.replace("\n","")
@@ -115,10 +116,13 @@ class VirtualKitty():
             image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
             image = cv.resize(image, (624,192), interpolation=cv.INTER_NEAREST)
             if self.seg_image:
-                image_seg = cv.imread(image_seg_path)
-                image_seg = cv.cvtColor(image_seg, cv.COLOR_BGR2RGB)
-                image_seg_channels, class_by_image = self._get_image_seg_channels(image_seg, class_by_image)
-                image_seg_channels = cv.resize(image_seg_channels, (624,192), interpolation=cv.INTER_NEAREST)
+                # image_seg = cv.imread(image_seg_path)
+                # image_seg = cv.cvtColor(image_seg, cv.COLOR_BGR2RGB)
+                # image_seg_channels, class_by_image = self._get_image_seg_channels(image_seg, class_by_image)
+                # image_seg_channels = cv.resize(image_seg_channels, (624,192), interpolation=cv.INTER_NEAREST)
+                image_seg_channels = np.load(image_seg_path)
+                image_seg_channels = np.moveaxis(image_seg_channels,1,3)
+                image_seg_channels = image_seg_channels[0]
             if self.depth_image:
                 image_depth = cv.imread(image_depth_path, cv.IMREAD_ANYCOLOR | cv.IMREAD_ANYDEPTH)
                 image_depth = cv.resize(image_depth, (624,192), interpolation=cv.INTER_NEAREST)
@@ -173,6 +177,10 @@ class VirtualKitty():
             
             # plt.waitforbuttonpress()
             # Yield when batch is full
+            if self.save_npy:
+                image_seg_npy = image_seg_path.replace(".png",".npy")
+                with open(image_seg_npy, 'wb') as f:
+                    np.save(f, targets)
             i += 1
             if ((i % print_images_load) == 0) or (i==1):
                 print("Imagenes cargadas", i, "/", lines_to_process, "para Train =", train, "test =", not train)
@@ -212,6 +220,7 @@ class VirtualKitty():
             batch[i%batch_size, 0] = self.norm(self.process(image[:,:,0]))
             batch[i%batch_size, 1] = self.norm(self.process(image[:,:,1]))
             batch[i%batch_size, 2] = self.norm(self.process(image[:,:,2]))
+            
             # Yield when batch is full
             i += 1
             if i > 0 and (i%batch_size) == 0:
