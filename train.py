@@ -84,18 +84,19 @@ if __name__ == "__main__":
     args_parsed = dict()
     parse_args()
     in_channels = 3
-    out_channels = 19
+    out_channels = 1
     seg_image = False
     depth_image = False
     seg_channels = out_channels
     if out_channels == 1:
         depth_image = True
-    elif out_channels == 19:
+    elif out_channels == 15:
         seg_image = True
-    elif out_channels == 19+1:
+    elif out_channels == 15+1:
         seg_image = True
         depth_image = True
         seg_channels -= 1
+    print("Seg channel ", seg_image, "depth channel", depth_image)
     model = FCN(in_channels, out_channels)
     if args_parsed['model'] != "":
         model.load_state_dict(torch.load(args_parsed['model']))

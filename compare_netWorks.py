@@ -22,7 +22,11 @@ config_file = 'configs/checkpoints/pspnet_r50-d8_512x1024_40k_cityscapes.py'
 checkpoint_file = 'configs/checkpoints/pspnet_r50-d8_512x1024_40k_cityscapes_20200605_003338-2966598c.pth'
 
 # build the model from a config file and a checkpoint file
-model_segmentator = init_segmentor(config_file, checkpoint_file, device='cuda:0')
+model_segmentator = init_segmentor(config_file, checkpoint_file, device='cuda:0') # 503 en vram
+for name, parameter in model_segmentator.named_parameters():
+    print("Parameter", name, parameter.numel())
+pytorch_total_params = sum(p.numel() for p in model_segmentator.parameters() if p.requires_grad)
+print("Numero de parametros totales", pytorch_total_params) # 194mb en vram
 os.chdir('..')
 
 def norm(image):
@@ -96,6 +100,21 @@ def read_depth_gt(image_path):
     image_depth = cv2.resize(image_depth, (624,192), interpolation=cv2.INTER_NEAREST)
     return norm(image_depth)#| cv2.CV_32F)
 
+def read_seg_gt_Vkitty(image_path):
+    image_seg_path = image_path
+    image_seg_path = image_seg_path.replace("/rgb/", "/classSegmentation/")
+    basename = os.path.basename(image_seg_path)
+    image_seg_path = image_seg_path.replace(basename,"")
+    file_name, ext = os.path.splitext(basename)
+    file_name_splitted = file_name.split("_")
+    basename = "classgt_" + file_name_splitted[-1] + ".npy"
+    image_seg_path = os.path.join(image_seg_path,basename)
+    image_seg_path = image_seg_path.replace("_rgb/","_classSegmentation/")
+    image_seg_channels = np.load(image_seg_path).astype(np.int8)
+    image_seg_channels = np.moveaxis(image_seg_channels,1,3)
+    image_seg_channels = image_seg_channels[0]
+    return image_seg_channels[:,:,:15]
+
 def read_seg_GT(image_path):
     # image_seg_path = image_path
     # image_seg_path = image_seg_path.replace("/rgb/", "/classSegmentation/")
@@ -131,6 +150,7 @@ def calculate_MSE_depth(imagen_monodepth, imagen_UNET, imagen_GT):
     imagen_UNET_tensor = torch.tensor(imagen_UNET)
     error_monodepth = mse_error(imagen_monodepth_tensor, imagen_GT_tensor)
     error_UNET = mse_error(imagen_UNET_tensor, imagen_GT_tensor)
+    print("min max monodepth", np.min(imagen_monodepth), np.max(imagen_monodepth), "min max unet", np.min(imagen_UNET), np.max(imagen_UNET))
     print("Error imagenes monodepth=", error_monodepth, "unet=", error_UNET)
     return error_monodepth, error_UNET
 
@@ -138,7 +158,7 @@ def calculate_IOU(imagen_seg_mmseg, seg_image_UNET, image_GT_seg):
     imagen_seg_mmseg_tensor = torch.tensor(imagen_seg_mmseg, dtype=torch.int8)
     seg_image_UNET_tensor = torch.tensor(seg_image_UNET)
     image_GT_seg_tensor = torch.tensor(image_GT_seg)
-    print("seg unet shape", seg_image_UNET_tensor.shape, seg_image_UNET_tensor.dtype, " image gt tensor shape", image_GT_seg_tensor.shape, "dtype", image_GT_seg_tensor.dtype, "mmseg", imagen_seg_mmseg_tensor.shape, imagen_seg_mmseg_tensor.dtype)
+    # print("seg unet shape", seg_image_UNET_tensor.shape, seg_image_UNET_tensor.dtype, " image gt tensor shape", image_GT_seg_tensor.shape, "dtype", image_GT_seg_tensor.dtype, "mmseg", imagen_seg_mmseg_tensor.shape, imagen_seg_mmseg_tensor.dtype)
     iou_UNET = IOU(seg_image_UNET_tensor, image_GT_seg_tensor)
     iou_mmseg = IOU(imagen_seg_mmseg_tensor, image_GT_seg_tensor)
     print("Error UNET", iou_UNET, "mmseg", iou_mmseg)
@@ -152,30 +172,40 @@ if __name__ == "__main__":
         lines_cityscapes = f.readlines()
     depth_monodepth_errors = []
     depth_UNET_errors = []
+    depth_UNET_depth_errors =[]
     seg_mmseg_iou = []
     seg_UNET_iou = []
+    seg_UNET_combined_iou = []
+    seg_UNET_seg_iou =[]
+
     # os.chdir('./monodepth2/')
     # print(os.getcwd())
     # image = predict_images(lines)
     # os.chdir('./monodepth2/')
-    gen_depth = predict_images(lines)
+    gen_depth = predict_images(lines) # 14842236
     # os.chdir('../mmsegmentation/')
-    gen_seg = get_imagen_segmentator(lines_cityscapes)
+    gen_seg = get_imagen_segmentator(lines_cityscapes) # 48975494
     # os.chdir('..')
-    gen_UNET = inference_image('/workspace/ruben/output_mix_full/basicUNET_epoch32.torch', './datasets/test.txt',VirtualKitty)
-    gen_UNET_city = inference_image('/workspace/datastorage/output_city_scapes/UNet.torch', './datasets/test_city.txt',CityScapes)
+    gen_UNET = inference_image('/workspace/ruben/output_mix_full/basicUNET_epoch32.torch', './datasets/test.txt',VirtualKitty) 
+    gen_UNET_segmentation = inference_image('/workspace/datastorage/model_seg_vkitty/basicUNET_epoch44.torch', './datasets/test.txt',VirtualKitty, 15)
+    gen_UNET_depth = inference_image('/workspace/datastorage/model_depth_vkitty/basicUNET_epoch44.torch', './datasets/test.txt',VirtualKitty, 1)
+    gen_UNET_city = inference_image('/workspace/datastorage/output_city_scapes/UNet.torch', './datasets/test_city.txt',CityScapes,19)
     cityScapes_loaded = CityScapes("",1,True, False,19, False)
     times_UNET = []
+    times_unet_segmentation = []
     times_seg = []
     times_depth = []
+    times_UNET_depth = []
     for image_number in range(len(lines)):
         image_GT_depth = read_depth_gt(lines[image_number])
+        image_GT_seg = read_seg_gt_Vkitty(lines[image_number])
         os.chdir('./monodepth2/')
         # start_depth = time.time()
         imagen_depth,vmax, final_time_depth = next(gen_depth)
-        print("Tiempo depth", final_time_depth)
+        # print("Tiempo depth", final_time_depth)
         # final_time_depth = time.time() - start_depth
         times_depth.append(final_time_depth)
+        print("Media de tiempo de profundidad monodepth", np.average(times_depth))
         imagen_depth = cv2.resize(imagen_depth, (624,192), interpolation=cv2.INTER_NEAREST)
         # imagen_depth = imagen_depth * 65536
         # vmax = vmax * 65536
@@ -183,10 +213,18 @@ if __name__ == "__main__":
         # plt.waitforbuttonpress()
         os.chdir('..')
         print(os.getcwd())
-        depth_image_UNET, seg_image_UNET, time_UNET_combined = next(gen_UNET)
-        print("Tiempo unet", time_UNET_combined)
+        depth_image_UNET, seg_image_UNET, time_UNET_combined = next(gen_UNET) # 39394448 # 148mb en vram
+        
+        _, seg_image_UNET_segmentation, time_unet_segmentation = next(gen_UNET_segmentation) # 39394383 # 1078mb en vram
+        # time.sleep(60)
+        depth_image_UNET_depth, _, time_unet_depth = next(gen_UNET_depth) # 39393473 # 168mb en vram
+        
+        # print("Tiempo unet", time_UNET_combined)
         times_UNET.append(time_UNET_combined)
+        times_unet_segmentation.append(time_unet_segmentation)
+        times_UNET_depth.append(time_unet_depth)
         depth_image_UNET = cv2.resize(depth_image_UNET, (624,192), interpolation=cv2.INTER_NEAREST)
+        depth_image_UNET_depth = cv2.resize(depth_image_UNET_depth, (624,192), interpolation=cv2.INTER_NEAREST)
         # seg_image_UNET = cv2.resize(seg_image_UNET, (624,192), interpolation=cv2.INTER_NEAREST)
         
         # Apply log transformation method
@@ -195,9 +233,17 @@ if __name__ == "__main__":
         # depth_image_UNET = c * (np.log(depth_image_UNET + 1))
         # plt.imshow(depth_image_UNET, cmap='gray')
         # plt.waitforbuttonpress()
+
+        iou_UNET_combined, iou_UNET_segmentation = calculate_IOU(seg_image_UNET, seg_image_UNET_segmentation, image_GT_seg)
+        seg_UNET_combined_iou.append(iou_UNET_combined)
+        seg_UNET_seg_iou.append(iou_UNET_segmentation)
         error_monodepth, error_UNET = calculate_MSE_depth(imagen_depth, depth_image_UNET, image_GT_depth)
+        error_UNET_depth, _ = calculate_MSE_depth(depth_image_UNET_depth, depth_image_UNET, image_GT_depth)
         depth_monodepth_errors.append(error_monodepth)
         depth_UNET_errors.append(error_UNET)
+        depth_UNET_depth_errors.append(error_UNET_depth)
+        print("Average times unet=", np.average(times_UNET), " unet_depth=", np.average(times_UNET_depth), " depth=", np.average(times_depth), "seg=", np.average(times_seg), "UNET_segmentation=", np.average(times_unet_segmentation))
+        print("Imagen", image_number, "de", len(lines))
     
     os.makedirs('./runs/compareNetworks/', exist_ok=True)
     len_runs = len(os.listdir('./runs/compareNetworks/'))
@@ -208,7 +254,7 @@ if __name__ == "__main__":
         os.chdir('./mmsegmentation')
         # start_seg_time = time.time()
         imagen_seg, final_seg_time = next(gen_seg)
-        print("Tiempo segmentatioon", final_seg_time)
+        # print("Tiempo segmentatioon", final_seg_time)
         # final_seg_time = time.time() - start_seg_time
         times_seg.append(final_seg_time)
         # print("imagen seg shape", imagen_seg.shape)
@@ -223,9 +269,12 @@ if __name__ == "__main__":
         iou_mmseg, iou_UNET = calculate_IOU(imagen_seg_channels, seg_image_UNET_city, image_GT_seg)
         seg_UNET_iou.append(iou_UNET)
         seg_mmseg_iou.append(iou_mmseg)
+        print("Imagen", image_number, "de", len(lines_cityscapes))
     print("Average depth error Monodepth2 = ", np.average(depth_monodepth_errors), "UNET=", np.average(depth_UNET_errors))
+    print("Average depth error UNET_depth = ", np.average(depth_UNET_depth_errors), "UNET=", np.average(depth_UNET_errors))
+    print("Average iou seg vs combined combined=", np.average(seg_UNET_combined_iou), "Segmentation=", np.average(seg_UNET_seg_iou))
     print("Average seg iou mmseg=", np.average(seg_mmseg_iou), "UNET=",np.average(seg_UNET_iou))
-    print("Average times unet=", np.average(times_UNET), " depth=", np.average(times_depth), "seg=", np.average(times_seg))
+    print("Average times unet=", np.average(times_UNET), " depth=", np.average(times_depth), "seg=", np.average(times_seg), "UNET_segmentation=", np.average(times_unet_segmentation))
     # imagen_counter = 0
     # for image, vmax in predict_images(lines):
     #     # image = np.subtract(1, image)

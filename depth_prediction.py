@@ -21,15 +21,22 @@ depth_decoder_path = os.path.join("models", model_name, "depth.pth")
 encoder = networks.ResnetEncoder(18, False)
 depth_decoder = networks.DepthDecoder(num_ch_enc=encoder.num_ch_enc, scales=range(4))
 
-loaded_dict_enc = torch.load(encoder_path, map_location='cpu')
+loaded_dict_enc = torch.load(encoder_path, map_location='cuda:0')
 filtered_dict_enc = {k: v for k, v in loaded_dict_enc.items() if k in encoder.state_dict()}
 encoder.load_state_dict(filtered_dict_enc)
 
-loaded_dict = torch.load(depth_decoder_path, map_location='cpu')
+loaded_dict = torch.load(depth_decoder_path, map_location='cuda:0')
 depth_decoder.load_state_dict(loaded_dict)
-
+for name, parameter in encoder.named_parameters():
+    print("Parameter", name, parameter.numel())
+encoder_params = sum(p.numel() for p in encoder.parameters() if p.requires_grad)
+for name, parameter in depth_decoder.named_parameters():
+    print("Parameter", name, parameter.numel())
+decoder_params = sum(p.numel() for p in depth_decoder.parameters() if p.requires_grad)
+print("Numero de parametros totales depth", encoder_params + decoder_params)
 encoder.eval()
-depth_decoder.eval();
+depth_decoder.eval()
+print("modelo cargado") # 697 mb en vram
 
 def inference(image, image_name, original_height, original_width, images_path):
     start_time = time.time()

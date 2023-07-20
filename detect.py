@@ -28,16 +28,20 @@ def parse_args():
     args_parsed['dataset'] = args.dataset
     print("Args parsed ", args_parsed)
 
-def inference_image(model_path, data_path, dataset:VirtualKitty or CityScapes):
+def inference_image(model_path, data_path, dataset:VirtualKitty or CityScapes, out_channels=16):
     
-    dataset_loaded = dataset(data_path, 1)
+    dataset_loaded = dataset(data_path, 1, output_classes=out_channels)
     out_channels = dataset_loaded.get_out_channels()
     seg_channels = dataset_loaded.get_seg_channels()
-    # print("Out channels", out_channels, "Seg channels", seg_channels )
+    print("Out channels", out_channels, "Seg channels", seg_channels )
     model = FCN(3, out_channels)
     # print("Model path", model_path, dataset)
     model.load_state_dict(torch.load(model_path))
     model.cuda(device=0)
+    for name, parameter in model.named_parameters():
+        print("Parameter", name, parameter.numel())
+    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print("Numero de parametros totales", pytorch_total_params)
     for batch in dataset_loaded.load_test():
         start_time = time.time()
         batch = torch.tensor(batch)
